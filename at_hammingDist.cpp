@@ -298,6 +298,12 @@ uint64_t *read_search_keys(const char *filename, uint64_t *key_count)
 
 int main()
 	{
+	#ifdef __AVX512F__
+		puts("AVX512");
+	#else
+		puts("scalar");
+	#endif
+
 	uint64_t a = 12345;
 	a = 164703072086692425;
 
@@ -328,6 +334,7 @@ key_count = key_count > 1000 ? 1000 : key_count;
 		auto stopwatch = JASS::timer::start();
 	#ifdef __AVX512F__
 		at_filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
+//		filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
 	#else
 		filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
 	#endif
