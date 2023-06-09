@@ -1,6 +1,5 @@
 /*
 	FIX: 	line_count -= line_count % 4;		// so that we have a full number of SIMD registers
-
 */
 
 #include <iostream>
@@ -24,6 +23,9 @@
 
 #include "timer.h"
 
+
+#define forceinline
+/*
 #ifdef __APPLE__
         #define forceinline __attribute__((always_inline)) inline
 #elif defined(__GNUC__)
@@ -33,6 +35,7 @@
 #else
         #define forceinline inline
 #endif
+*/
 
 char *read_entire_file(const char *filename)
 	{
@@ -108,8 +111,8 @@ return line_list;
 forceinline uint64_t hammingDistance(uint64_t a, uint64_t b)
 	{
 	uint64_t xorResult = a ^ b;
-	return std::bitset<64>(xorResult).count();
-//	return __popcnt64(xorResult);
+//	return std::bitset<64>(xorResult).count();
+	return __popcnt64(xorResult);
 	}
 
 void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, uint64_t maxDistance, std::vector<uint64_t>& filteredB) {
@@ -117,7 +120,7 @@ void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, 
     filteredB.reserve(b.size());
 
     for (size_t i = 0; i < b.size(); i++) {
-        int distance = hammingDistance(a, b[i]);
+        uint64_t distance = hammingDistance(a, b[i]);
         if (distance <= maxDistance) {
             filteredB.push_back(b[i]);
         }
@@ -127,7 +130,7 @@ void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, 
 }
 
 #ifdef __AVX512F__
-__m256i hs_popcount(const __m256i v)
+forceinline __m256i hs_popcount(const __m256i v)
 	{
 	const __m256i m1 = _mm256_set1_epi8(0x55);
 	const __m256i m2 = _mm256_set1_epi8(0x33);
@@ -175,8 +178,8 @@ void at_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t> &
 		{
 		__m256i data = _mm256_loadu_si256((__m256i_u *)current);
 		__m256i xorResult = _mm256_xor_epi64(key, data);
-//		__m256i counts = popcount_avx2_64(xorResult);
-		__m256i counts = hs_popcount(xorResult);
+		__m256i counts = popcount_avx2_64(xorResult);
+//		__m256i counts = hs_popcount(xorResult);
 
 		__mmask8 triggers = _mm256_cmple_epi64_mask(counts, threshold);
 		switch (triggers)
