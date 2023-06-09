@@ -29,12 +29,12 @@ auto ans = popcount(*(__m256i *)data);
 memcpy(output, &ans, sizeof(ans));
 
 for (int i = 0; i < sizeof(output) / sizeof(*output); i++)
-	printf("%02X ", data[i]);
+	printf("%02llX ", data[i]);
 
 puts("");
 
 for (int i = 0; i < sizeof(output) / sizeof(*output); i++)
-	printf("%02X ", output[i]);
+	printf("%02llX ", output[i]);
 
 puts("");
 return 0;

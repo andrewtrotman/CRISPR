@@ -1,3 +1,8 @@
+/*
+	FIX: 	line_count -= line_count % 4;		// so that we have a full number of SIMD registers
+
+*/
+
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -33,7 +38,7 @@ char *read_entire_file(const char *filename)
 	{
 	FILE *fp;
 	struct stat details;
-	char *contents;
+	char *contents = NULL;
 
 	if ((fp = fopen(filename, "rb")) != NULL)
 		{
@@ -52,10 +57,10 @@ char *read_entire_file(const char *filename)
 return contents;
 }
 
-char **buffer_to_list(char *buffer, long long *lines)
+char **buffer_to_list(char *buffer, uint64_t *lines)
 {
 char *pos, **line_list, **current_line;
-long n_frequency, r_frequency;
+uint64_t n_frequency, r_frequency;
 
 n_frequency = r_frequency = 0;
 for (pos = buffer; *pos != '\0'; pos++)
@@ -121,6 +126,7 @@ void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, 
     std::sort(filteredB.begin(), filteredB.end());
 }
 
+#ifdef __AVX512F__
 __m256i hs_popcount(const __m256i v)
 	{
 	const __m256i m1 = _mm256_set1_epi8(0x55);
@@ -178,71 +184,116 @@ void at_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t> &
 			case 0:
 				break;
 			case 1:
-            filteredB.push_back(*(current + 0));
+				filteredB.push_back(*(current + 0));
 				break;
 			case 2:
-            filteredB.push_back(*(current + 1));
+				filteredB.push_back(*(current + 1));
 				break;
 			case 3:
-            filteredB.push_back(*(current + 1));
-            filteredB.push_back(*(current + 0));
+				filteredB.push_back(*(current + 1));
+				filteredB.push_back(*(current + 0));
 				break;
 			case 4:
-            filteredB.push_back(*(current + 2));
+				filteredB.push_back(*(current + 2));
 				break;
 			case 5:
-            filteredB.push_back(*(current + 2));
-            filteredB.push_back(*(current + 0));
+				filteredB.push_back(*(current + 2));
+				filteredB.push_back(*(current + 0));
 				break;
 			case 6:
-            filteredB.push_back(*(current + 2));
-            filteredB.push_back(*(current + 1));
+				filteredB.push_back(*(current + 2));
+				filteredB.push_back(*(current + 1));
 				break;
 			case 7:
-            filteredB.push_back(*(current + 2));
-            filteredB.push_back(*(current + 1));
-            filteredB.push_back(*(current + 0));
+				filteredB.push_back(*(current + 2));
+				filteredB.push_back(*(current + 1));
+				filteredB.push_back(*(current + 0));
 				break;
 			case 8:
-            filteredB.push_back(*(current + 3));
+				filteredB.push_back(*(current + 3));
 				break;
 			case 9:
-            filteredB.push_back(*(current + 3));
-            filteredB.push_back(*(current + 0));
+				filteredB.push_back(*(current + 3));
+				filteredB.push_back(*(current + 0));
 				break;
 			case 0x0A:
-            filteredB.push_back(*(current + 3));
-            filteredB.push_back(*(current + 1));
+				filteredB.push_back(*(current + 3));
+				filteredB.push_back(*(current + 1));
 				break;
 			case 0x0B:
-            filteredB.push_back(*(current + 3));
-            filteredB.push_back(*(current + 1));
-            filteredB.push_back(*(current + 0));
+				filteredB.push_back(*(current + 3));
+				filteredB.push_back(*(current + 1));
+				filteredB.push_back(*(current + 0));
 				break;
 			case 0x0C:
-            filteredB.push_back(*(current + 3));
-            filteredB.push_back(*(current + 2));
+				filteredB.push_back(*(current + 3));
+				filteredB.push_back(*(current + 2));
 				break;
 			case 0x0D:
-            filteredB.push_back(*(current + 3));
-            filteredB.push_back(*(current + 2));
-            filteredB.push_back(*(current + 0));
+				filteredB.push_back(*(current + 3));
+				filteredB.push_back(*(current + 2));
+				filteredB.push_back(*(current + 0));
 				break;
 			case 0x0E:
-            filteredB.push_back(*(current + 3));
-            filteredB.push_back(*(current + 2));
-            filteredB.push_back(*(current + 1));
+				filteredB.push_back(*(current + 3));
+				filteredB.push_back(*(current + 2));
+				filteredB.push_back(*(current + 1));
 				break;
 			case 0x0F:
-            filteredB.push_back(*(current + 3));
-            filteredB.push_back(*(current + 2));
-            filteredB.push_back(*(current + 1));
-            filteredB.push_back(*(current + 0));
+				filteredB.push_back(*(current + 3));
+				filteredB.push_back(*(current + 2));
+				filteredB.push_back(*(current + 1));
+				filteredB.push_back(*(current + 0));
 				break;
 			}
 		}
 
 	std::sort(filteredB.begin(), filteredB.end());
+	}
+
+#endif
+
+
+// Function to convert a 20mer sequence to its packed representation
+uint64_t pack20mer(const char *sequence)
+	{
+	uint64_t packedSequence = 0;
+	for (const char *end = sequence + 20; sequence < end; sequence++)
+		{
+		uint64_t baseEncoding;
+		switch (*sequence)
+			{
+			case 'A':
+				baseEncoding = 1;
+				break;
+			case 'C':
+				baseEncoding = 2;
+				break;
+			case 'G':
+				baseEncoding = 4;
+				break;
+			case 'T':
+				baseEncoding = 7;
+				break;
+			default:
+				baseEncoding = 0;
+				break;
+			}
+		packedSequence = (packedSequence << 3) | baseEncoding;
+		}
+	return packedSequence;
+	}
+
+uint64_t *read_search_keys(const char *filename, uint64_t *key_count)
+	{
+	char *data = read_entire_file(filename);
+	char **lines = buffer_to_list(data, key_count);
+
+	uint64_t *keys = new uint64_t[*key_count];
+	for (size_t which = 0; which < *key_count; which++)
+		keys[which] = pack20mer(lines[which]);
+
+	return keys;
 	}
 
 int main()
@@ -251,28 +302,48 @@ int main()
 	a = 164703072086692425;
 
 	std::vector<uint64_t> b = {54321, 67890, 98765, 24680};
-	uint64_t maxDistance = 6;
+	uint64_t maxDistance = 4;
 
 	char *data = read_entire_file("OryzaPacked20mers.txt");
-	long long line_count;
+	uint64_t line_count;
 	char **lines = buffer_to_list(data, &line_count);
 	b.resize(line_count);
 	for (size_t which = 0; which < line_count; which++)
-	b[which] = atoll(lines[which]);
+		b[which] = atoll(lines[which]);
 
 	line_count -= line_count % 4;		// so that we have a full number of SIMD registers
 
-	std::vector<uint64_t> filteredB;
-	auto stopwatch = JASS::timer::start();
-	at_filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
-	auto took = JASS::timer::stop(stopwatch);
-	std::cout << "Took:" << took.milliseconds() << "\n";
 
-	// Print the filtered and sorted results
-	for (auto value : filteredB)
-		std::cout << value << " ";
+	uint64_t key_count;
+	uint64_t *search_keys = read_search_keys("OSativaCandidates.txt", &key_count);
 
-	std::cout << std::endl;
+key_count = key_count > 1000 ? 1000 : key_count;
+
+	auto search_time_stopwatch = JASS::timer::start();
+
+	for (uint64_t key = 0; key < key_count; key++)
+		{
+		a = search_keys[key];
+		std::vector<uint64_t> filteredB;
+		auto stopwatch = JASS::timer::start();
+	#ifdef __AVX512F__
+		at_filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
+	#else
+		filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
+	#endif
+		auto took = JASS::timer::stop(stopwatch);
+		std::cout << "Took:" << took.milliseconds() << "\n";
+
+		// Print the filtered and sorted results
+		for (auto value : filteredB)
+			std::cout << value << " ";
+
+		std::cout << std::endl;
+		}
+
+	auto took = JASS::timer::stop(search_time_stopwatch);
+	std::cout << "TOTAL Took:" << took.milliseconds() << "\n";
+
 
 	return 0;
 	}
