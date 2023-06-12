@@ -1,5 +1,5 @@
 /*
-	FIX: 	line_count -= line_count % 4;		// so that we have a full number of SIMD registers
+	FIX: 	line_count -= line_count % 8;		// so that we have a full number of SIMD registers
 */
 
 #include <iostream>
@@ -114,8 +114,8 @@ return line_list;
 forceinline uint64_t hammingDistance(uint64_t a, uint64_t b)
 	{
 	uint64_t xorResult = a ^ b;
-//	return std::bitset<64>(xorResult).count();
-	return __popcnt64(xorResult);
+	return std::bitset<64>(xorResult).count();
+//	return __popcnt64(xorResult);
 	}
 
 void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, uint64_t maxDistance, std::vector<uint64_t>& filteredB) {
@@ -168,7 +168,8 @@ __m512i hs512_popcount(const __m512i v)
 	return _mm512_sad_epu8(t3, _mm512_setzero_si512());
 	}
 
-/*
+
+
 forceinline __m256i hs_popcount(const __m256i v)
 	{
 	const __m256i m1 = _mm256_set1_epi8(0x55);
@@ -180,7 +181,7 @@ forceinline __m256i hs_popcount(const __m256i v)
 	const __m256i t3 = _mm256_add_epi8(t2, _mm256_srli_epi16(t2, 4)) &m4;
 	return _mm256_sad_epu8(t3, _mm256_setzero_si256());
 	}
-*/
+
 
 const __m256i lookup = _mm256_setr_epi8(
             /* 0 */ 0, /* 1 */ 1, /* 2 */ 1, /* 3 */ 2,
@@ -229,7 +230,6 @@ size_t at_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>
 
 	return current_answer - filteredB;
 	}
-
 
 size_t at512_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t> &b, uint64_t maxDistance, uint64_t *filteredB)
 	{
@@ -301,63 +301,81 @@ uint64_t *read_search_keys(const char *filename, uint64_t *key_count)
 	return keys;
 	}
 
-int main()
+uint64_t read_encoded_data(std::vector<uint64_t> &into, const char *filename)
 	{
-	#ifdef __AVX512F__
-		puts("AVX512");
-	#else
-		puts("scalar");
-	#endif
-
-	uint64_t a = 12345;
-	a = 164703072086692425;
-
-	std::vector<uint64_t> b = {54321, 67890, 98765, 24680};
-	uint64_t maxDistance = 4;
-
 	char *data = read_entire_file("OryzaPacked20mers.txt");
 	uint64_t line_count;
 	char **lines = buffer_to_list(data, &line_count);
-	b.resize(line_count);
+	into.resize(line_count);
 	for (size_t which = 0; which < line_count; which++)
-		b[which] = atoll(lines[which]);
+		into[which] = atoll(lines[which]);
 
-	line_count -= line_count % 4;		// so that we have a full number of SIMD registers
+	return line_count;
+	}
 
 
-	uint64_t key_count;
-	uint64_t *search_keys = read_search_keys("OSativaCandidates.txt", &key_count);
-
-	auto search_time_stopwatch = JASS::timer::start();
-
+void process_512_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
+	{
 	#ifdef __AVX512F__
-		uint64_t *result_set = new uint64_t [b.size()];
+		uint64_t *result_set = new uint64_t [encoded_data.size()];
+		for (uint64_t key = 0; key < key_count; key++)
+			{
+			uint64_t current_key = search_keys[key];
+
+			auto stopwatch = JASS::timer::start();
+			size_t found = at512_filterAndSortByHammingDistance(current_key, encoded_data, maxDistance, result_set);
+			auto took = JASS::timer::stop(stopwatch);
+			std::cout << "Took:" << took.milliseconds() << "\n";
+
+			// Print the filtered and sorted results
+			uint64_t *end = result_set + found;
+			for (uint64_t *current  = result_set; current < end; current++)
+				std::cout << *current << " ";
+
+			std::cout << std::endl;
+			}
+		delete [] result_set;
 	#else
-		std::vector<uint64_t> filteredB;
+		puts("AXV512 not supported on this CPU");
 	#endif
-	
+	}
+
+
+void process_256_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
+	{
+	#ifdef __AVX512F__
+		uint64_t *result_set = new uint64_t [encoded_data.size()];
+		for (uint64_t key = 0; key < key_count; key++)
+			{
+			uint64_t current_key = search_keys[key];
+
+			auto stopwatch = JASS::timer::start();
+			size_t found = at_filterAndSortByHammingDistance(current_key, encoded_data, maxDistance, result_set);
+			auto took = JASS::timer::stop(stopwatch);
+			std::cout << "Took:" << took.milliseconds() << "\n";
+
+			// Print the filtered and sorted results
+			uint64_t *end = result_set + found;
+			for (uint64_t *current  = result_set; current < end; current++)
+				std::cout << *current << " ";
+
+			std::cout << std::endl;
+			}
+		delete [] result_set;
+	#else
+		puts("AXV512 not supported on this CPU");
+	#endif
+	}
+
+void process_64_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
+	{
+	std::vector<uint64_t> filteredB;
 	for (uint64_t key = 0; key < key_count; key++)
 		{
-		a = search_keys[key];
-	#ifdef __AVX512F__
-		auto stopwatch = JASS::timer::start();
-
-//		size_t found = at_filterAndSortByHammingDistance(a, b, maxDistance, result_set);
-		size_t found = at512_filterAndSortByHammingDistance(a, b, maxDistance, result_set);
-
-		auto took = JASS::timer::stop(stopwatch);
-		std::cout << "Took:" << took.milliseconds() << "\n";
-
-		// Print the filtered and sorted results
-		uint64_t *end = result_set + found;
-		for (uint64_t *current  = result_set; current < end; current++)
-			std::cout << *current << " ";
-
-		std::cout << std::endl;
-	#else
+		uint64_t current_key = search_keys[key];
 		filteredB.clear();
 		auto stopwatch = JASS::timer::start();
-		filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
+		filterAndSortByHammingDistance(current_key, encoded_data, maxDistance, filteredB);
 		auto took = JASS::timer::stop(stopwatch);
 		std::cout << "Took:" << took.milliseconds() << "\n";
 
@@ -366,12 +384,48 @@ int main()
 			std::cout << value << " ";
 
 		std::cout << std::endl;
-	#endif
 		}
+	}
 
+
+
+int usage(const char *exename)
+	{
+	printf("Usage:%s <64 | 256 | 512>", exename);
+	return 1;
+	}
+
+int main(int argc, const char *argv[])
+	{
+	std::vector<uint64_t> b;
+	long bits_parallel;
+	uint64_t maxDistance = 4;
+
+	if (argc != 2)
+		exit(usage(argv[0]));
+
+	bits_parallel = atol(argv[1]);
+	if (bits_parallel != 64 && bits_parallel != 256 && bits_parallel != 512)
+		exit(usage(argv[0]));
+
+	uint64_t line_count = read_encoded_data(b, "OryzaPacked20mers.txt");
+	line_count -= line_count % 8;		// so that we have a full number of SIMD registers
+
+	uint64_t key_count;
+	uint64_t *search_keys = read_search_keys("OSativaCandidates.txt", &key_count);
+
+	auto method = process_64_bits_wide;
+	if (bits_parallel == 64)
+		method = process_64_bits_wide;
+	else if (bits_parallel == 256)
+		method = process_256_bits_wide;
+	else if (bits_parallel == 512)
+		method = process_512_bits_wide;
+
+	auto search_time_stopwatch = JASS::timer::start();
+	method(b, search_keys, key_count, maxDistance);
 	auto took = JASS::timer::stop(search_time_stopwatch);
 	std::cout << "TOTAL Took:" << took.milliseconds() << "\n";
-
 
 	return 0;
 	}
