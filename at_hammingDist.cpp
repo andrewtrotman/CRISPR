@@ -328,8 +328,6 @@ int main()
 	uint64_t key_count;
 	uint64_t *search_keys = read_search_keys("OSativaCandidates.txt", &key_count);
 
-key_count = key_count > 1000 ? 1000 : key_count;
-
 	auto search_time_stopwatch = JASS::timer::start();
 
 	#ifdef __AVX512F__
