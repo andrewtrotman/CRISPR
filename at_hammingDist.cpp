@@ -8,16 +8,20 @@
 #include <bitset>
 #include <cstdint>
 
-#ifndef _MSC_VER
+#ifdef _MSC_VER
+	#define __m256i_u __m256i
+#else
 	#include <sys/types.h>
 	#include <sys/stat.h>
 	#include <unistd.h>
 
 	#define __popcnt64 __builtin_popcountll
 	#define __popcnt16 __builtin_popcount
-#else
-	#define __m256i_u __m256i
-	#define __AVX512F__ 1
+	#ifdef __APPLE__
+		#undef __AVX512F__
+	#else
+		#define __AVX512F__ 1
+	#endif
 #endif
 
 #include <immintrin.h>
@@ -153,16 +157,16 @@ forceinline __m512i popcnt_AVX512BW_lookup_original(__m512i vec)
 	}
 
 __m512i hs512_popcount(const __m512i v)
-{
-  const __m512i m1 = _mm512_set1_epi8(0x55);
-  const __m512i m2 = _mm512_set1_epi8(0x33);
-  const __m512i m4 = _mm512_set1_epi8(0x0F);
+	{
+	const __m512i m1 = _mm512_set1_epi8(0x55);
+	const __m512i m2 = _mm512_set1_epi8(0x33);
+	const __m512i m4 = _mm512_set1_epi8(0x0F);
 
-  const __m512i t1 = _mm512_sub_epi8(v,       (_mm512_srli_epi16(v,  1) & m1));
-  const __m512i t2 = _mm512_add_epi8(t1 & m2, (_mm512_srli_epi16(t1, 2) & m2));
-  const __m512i t3 = _mm512_add_epi8(t2, _mm512_srli_epi16(t2, 4)) & m4;
-  return _mm512_sad_epu8(t3, _mm512_setzero_si512());
-}
+	const __m512i t1 = _mm512_sub_epi8(v,       (_mm512_srli_epi16(v,  1) & m1));
+	const __m512i t2 = _mm512_add_epi8(t1 & m2, (_mm512_srli_epi16(t1, 2) & m2));
+	const __m512i t3 = _mm512_add_epi8(t2, _mm512_srli_epi16(t2, 4)) & m4;
+	return _mm512_sad_epu8(t3, _mm512_setzero_si512());
+	}
 
 /*
 forceinline __m256i hs_popcount(const __m256i v)
@@ -328,8 +332,12 @@ key_count = key_count > 1000 ? 1000 : key_count;
 
 	auto search_time_stopwatch = JASS::timer::start();
 
-	std::vector<uint64_t> filteredB;
-	uint64_t *result_set = new uint64_t [b.size()];
+	#ifdef __AVX512F__
+		uint64_t *result_set = new uint64_t [b.size()];
+	#else
+		std::vector<uint64_t> filteredB;
+	#endif
+	
 	for (uint64_t key = 0; key < key_count; key++)
 		{
 		a = search_keys[key];
