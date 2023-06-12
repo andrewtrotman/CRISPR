@@ -327,12 +327,13 @@ void process_512_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 			auto took = JASS::timer::stop(stopwatch);
 			std::cout << "Took:" << took.milliseconds() << "\n";
 
+#ifdef PRINT_RESULT
 			// Print the filtered and sorted results
 			uint64_t *end = result_set + found;
 			for (uint64_t *current  = result_set; current < end; current++)
 				std::cout << *current << " ";
-
 			std::cout << std::endl;
+#endif
 			}
 		delete [] result_set;
 	#else
@@ -354,12 +355,13 @@ void process_256_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 			auto took = JASS::timer::stop(stopwatch);
 			std::cout << "Took:" << took.milliseconds() << "\n";
 
+#ifdef PRINT_RESULT
 			// Print the filtered and sorted results
 			uint64_t *end = result_set + found;
 			for (uint64_t *current  = result_set; current < end; current++)
 				std::cout << *current << " ";
-
 			std::cout << std::endl;
+#endif
 			}
 		delete [] result_set;
 	#else
@@ -379,11 +381,12 @@ void process_64_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_
 		auto took = JASS::timer::stop(stopwatch);
 		std::cout << "Took:" << took.milliseconds() << "\n";
 
+#ifdef PRINT_RESULT
 		// Print the filtered and sorted results
 		for (auto value : filteredB)
 			std::cout << value << " ";
-
 		std::cout << std::endl;
+#endif
 		}
 	}
 
