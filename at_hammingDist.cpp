@@ -129,23 +129,23 @@ void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, 
 }
 
 #ifdef __AVX512F__
+const __m512i mm512_lookup = _mm512_setr_epi64
+	(
+	0x0302020102010100llu, 0x0403030203020201llu,
+	0x0302020102010100llu, 0x0403030203020201llu,
+	0x0302020102010100llu, 0x0403030203020201llu,
+	0x0302020102010100llu, 0x0403030203020201llu
+	);
 
-forceinline std::uint64_t popcnt_AVX512BW_lookup_original(__m512i vec)
+const __m512i mm512_low_mask = _mm512_set1_epi8(0x0f);
+
+
+forceinline __m512i popcnt_AVX512BW_lookup_original(__m512i vec)
 	{
-	const __m512i lookup = _mm512_setr_epi64
-		(
-		0x0302020102010100llu, 0x0403030203020201llu,
-		0x0302020102010100llu, 0x0403030203020201llu,
-		0x0302020102010100llu, 0x0403030203020201llu,
-		0x0302020102010100llu, 0x0403030203020201llu
-		);
-
-	const __m512i low_mask = _mm512_set1_epi8(0x0f);
-
-	const __m512i lo  = _mm512_and_si512(vec, low_mask);
-	const __m512i hi  = _mm512_and_si512(_mm512_srli_epi32(vec, 4), low_mask);
-	const __m512i popcnt1 = _mm512_shuffle_epi8(lookup, lo);
-	const __m512i popcnt2 = _mm512_shuffle_epi8(lookup, hi);
+	const __m512i lo  = _mm512_and_si512(vec, mm512_low_mask);
+	const __m512i hi  = _mm512_and_si512(_mm512_srli_epi32(vec, 4), mm512_low_mask);
+	const __m512i popcnt1 = _mm512_shuffle_epi8(mm512_lookup, lo);
+	const __m512i popcnt2 = _mm512_shuffle_epi8(mm512_lookup, hi);
 
 	const __m512i local = _mm512_add_epi8(popcnt2, popcnt1);
 	const __m512i ret =_mm512_sad_epu8(local, _mm512_setzero_si512());
@@ -221,8 +221,8 @@ size_t at512_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64
 	{
 	uint64_t *current_answer = filteredB;
 
-	__m512i key = _mm512_set1_epi64x(a);
-	__m512i threshold = _mm512_set1_epi64x(maxDistance);
+	__m512i key = _mm512_set1_epi64(a);
+	__m512i threshold = _mm512_set1_epi64(maxDistance);
 
 	const uint64_t *end = &b[b.size()];
 	for (uint64_t *current = (uint64_t *)&b[0]; current < end; current += 8)
