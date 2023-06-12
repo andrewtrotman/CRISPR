@@ -14,6 +14,7 @@
 	#include <unistd.h>
 
 	#define __popcnt64 __builtin_popcountll
+	#define __popcnt16 __builtin_popcount
 #else
 	#define __m256i_u __m256i
 	#define __AVX512F__ 1
