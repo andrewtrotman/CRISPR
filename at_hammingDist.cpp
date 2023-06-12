@@ -25,8 +25,6 @@
 #include "timer.h"
 
 
-#define forceinline
-/*
 #ifdef __APPLE__
         #define forceinline __attribute__((always_inline)) inline
 #elif defined(__GNUC__)
@@ -36,7 +34,7 @@
 #else
         #define forceinline inline
 #endif
-*/
+
 
 char *read_entire_file(const char *filename)
 	{
@@ -131,6 +129,31 @@ void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, 
 }
 
 #ifdef __AVX512F__
+
+forceinline std::uint64_t popcnt_AVX512BW_lookup_original(__m512i vec)
+	{
+	const __m512i lookup = _mm512_setr_epi64
+		(
+		0x0302020102010100llu, 0x0403030203020201llu,
+		0x0302020102010100llu, 0x0403030203020201llu,
+		0x0302020102010100llu, 0x0403030203020201llu,
+		0x0302020102010100llu, 0x0403030203020201llu
+		);
+
+	const __m512i low_mask = _mm512_set1_epi8(0x0f);
+
+	const __m512i lo  = _mm512_and_si512(vec, low_mask);
+	const __m512i hi  = _mm512_and_si512(_mm512_srli_epi32(vec, 4), low_mask);
+	const __m512i popcnt1 = _mm512_shuffle_epi8(lookup, lo);
+	const __m512i popcnt2 = _mm512_shuffle_epi8(lookup, hi);
+
+	const __m512i local = _mm512_add_epi8(popcnt2, popcnt1);
+	const __m512i ret =_mm512_sad_epu8(local, _mm512_setzero_si512());
+	return ret;
+	}
+
+
+
 /*
 forceinline __m256i hs_popcount(const __m256i v)
 	{
@@ -185,6 +208,31 @@ size_t at_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>
 
 		__mmask8 triggers = _mm256_cmple_epi64_mask(counts, threshold);
 		_mm256_mask_compressstoreu_epi64(current_answer, triggers, data);
+		current_answer += __popcnt16(triggers);
+		}
+
+	std::sort(filteredB, current_answer);
+
+	return current_answer - filteredB;
+	}
+
+
+size_t at512_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t> &b, uint64_t maxDistance, uint64_t *filteredB)
+	{
+	uint64_t *current_answer = filteredB;
+
+	__m512i key = _mm512_set1_epi64x(a);
+	__m512i threshold = _mm512_set1_epi64x(maxDistance);
+
+	const uint64_t *end = &b[b.size()];
+	for (uint64_t *current = (uint64_t *)&b[0]; current < end; current += 8)
+		{
+		__m512i data = _mm512_loadu_si512((__m512i_u *)current);
+		__m512i xorResult = _mm512_xor_epi64(key, data);
+		__m512i counts = popcnt_AVX512BW_lookup_original(xorResult);
+
+		__mmask8 triggers = _mm512_cmple_epi64_mask(counts, threshold);
+		_mm512_mask_compressstoreu_epi64(current_answer, triggers, data);
 		current_answer += __popcnt16(triggers);
 		}
 
@@ -276,7 +324,10 @@ key_count = key_count > 1000 ? 1000 : key_count;
 		a = search_keys[key];
 	#ifdef __AVX512F__
 		auto stopwatch = JASS::timer::start();
-		size_t found = at_filterAndSortByHammingDistance(a, b, maxDistance, result_set);
+
+//		size_t found = at_filterAndSortByHammingDistance(a, b, maxDistance, result_set);
+		size_t found = at512_filterAndSortByHammingDistance(a, b, maxDistance, result_set);
+
 		auto took = JASS::timer::stop(stopwatch);
 		std::cout << "Took:" << took.milliseconds() << "\n";
 
