@@ -16,7 +16,7 @@
 	#define __popcnt64 __builtin_popcountll
 #else
 	#define __m256i_u __m256i
-
+	#define __AVX512F__ 1
 #endif
 
 #include <immintrin.h>
@@ -130,18 +130,19 @@ void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, 
 }
 
 #ifdef __AVX512F__
+/*
 forceinline __m256i hs_popcount(const __m256i v)
 	{
 	const __m256i m1 = _mm256_set1_epi8(0x55);
 	const __m256i m2 = _mm256_set1_epi8(0x33);
 	const __m256i m4 = _mm256_set1_epi8(0x0F);
 
-	const __m256i t1 = _mm256_sub_epi8(v,       (_mm256_srli_epi16(v,  1) & m1));
-	const __m256i t2 = _mm256_add_epi8(t1 & m2, (_mm256_srli_epi16(t1, 2) & m2));
-	const __m256i t3 = _mm256_add_epi8(t2, _mm256_srli_epi16(t2, 4)) & m4;
+	const __m256i t1 = _mm256_sub_epi8(v,       (_mm256_srli_epi16(v,  1) &m1));
+	const __m256i t2 = _mm256_add_epi8(t1 & m2, (_mm256_srli_epi16(t1, 2) &m2));
+	const __m256i t3 = _mm256_add_epi8(t2, _mm256_srli_epi16(t2, 4)) &m4;
 	return _mm256_sad_epu8(t3, _mm256_setzero_si256());
 	}
-
+*/
 
 const __m256i lookup = _mm256_setr_epi8(
             /* 0 */ 0, /* 1 */ 1, /* 2 */ 1, /* 3 */ 2,
@@ -166,9 +167,9 @@ forceinline __m256i popcount_avx2_64(const __m256i vec) noexcept
 	return ret;
 	}
 
-void at_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t> &b, uint64_t maxDistance, std::vector<uint64_t>& filteredB)
+size_t at_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t> &b, uint64_t maxDistance, uint64_t *filteredB)
 	{
-    filteredB.reserve(b.size());
+	uint64_t *current_answer = filteredB;
 
 	__m256i key = _mm256_set1_epi64x(a);
 	__m256i threshold = _mm256_set1_epi64x(maxDistance);
@@ -182,76 +183,13 @@ void at_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t> &
 //		__m256i counts = hs_popcount(xorResult);
 
 		__mmask8 triggers = _mm256_cmple_epi64_mask(counts, threshold);
-		switch (triggers)
-			{
-			case 0:
-				break;
-			case 1:
-				filteredB.push_back(*(current + 0));
-				break;
-			case 2:
-				filteredB.push_back(*(current + 1));
-				break;
-			case 3:
-				filteredB.push_back(*(current + 1));
-				filteredB.push_back(*(current + 0));
-				break;
-			case 4:
-				filteredB.push_back(*(current + 2));
-				break;
-			case 5:
-				filteredB.push_back(*(current + 2));
-				filteredB.push_back(*(current + 0));
-				break;
-			case 6:
-				filteredB.push_back(*(current + 2));
-				filteredB.push_back(*(current + 1));
-				break;
-			case 7:
-				filteredB.push_back(*(current + 2));
-				filteredB.push_back(*(current + 1));
-				filteredB.push_back(*(current + 0));
-				break;
-			case 8:
-				filteredB.push_back(*(current + 3));
-				break;
-			case 9:
-				filteredB.push_back(*(current + 3));
-				filteredB.push_back(*(current + 0));
-				break;
-			case 0x0A:
-				filteredB.push_back(*(current + 3));
-				filteredB.push_back(*(current + 1));
-				break;
-			case 0x0B:
-				filteredB.push_back(*(current + 3));
-				filteredB.push_back(*(current + 1));
-				filteredB.push_back(*(current + 0));
-				break;
-			case 0x0C:
-				filteredB.push_back(*(current + 3));
-				filteredB.push_back(*(current + 2));
-				break;
-			case 0x0D:
-				filteredB.push_back(*(current + 3));
-				filteredB.push_back(*(current + 2));
-				filteredB.push_back(*(current + 0));
-				break;
-			case 0x0E:
-				filteredB.push_back(*(current + 3));
-				filteredB.push_back(*(current + 2));
-				filteredB.push_back(*(current + 1));
-				break;
-			case 0x0F:
-				filteredB.push_back(*(current + 3));
-				filteredB.push_back(*(current + 2));
-				filteredB.push_back(*(current + 1));
-				filteredB.push_back(*(current + 0));
-				break;
-			}
+		_mm256_mask_compressstoreu_epi64(current_answer, triggers, data);
+		current_answer += __popcnt16(triggers);
 		}
 
-	std::sort(filteredB.begin(), filteredB.end());
+	std::sort(filteredB, current_answer);
+
+	return current_answer - filteredB;
 	}
 
 #endif
@@ -330,17 +268,27 @@ key_count = key_count > 1000 ? 1000 : key_count;
 
 	auto search_time_stopwatch = JASS::timer::start();
 
+	std::vector<uint64_t> filteredB;
+	uint64_t *result_set = new uint64_t [b.size()];
 	for (uint64_t key = 0; key < key_count; key++)
 		{
 		a = search_keys[key];
-		std::vector<uint64_t> filteredB;
-		auto stopwatch = JASS::timer::start();
 	#ifdef __AVX512F__
-		at_filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
-//		filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
+		auto stopwatch = JASS::timer::start();
+		size_t found = at_filterAndSortByHammingDistance(a, b, maxDistance, result_set);
+		auto took = JASS::timer::stop(stopwatch);
+		std::cout << "Took:" << took.milliseconds() << "\n";
+
+		// Print the filtered and sorted results
+		uint64_t *end = result_set + found;
+		for (uint64_t *current  = result_set; current < end; current++)
+			std::cout << *current << " ";
+
+		std::cout << std::endl;
 	#else
+		filteredB.clear();
+		auto stopwatch = JASS::timer::start();
 		filterAndSortByHammingDistance(a, b, maxDistance, filteredB);
-	#endif
 		auto took = JASS::timer::stop(stopwatch);
 		std::cout << "Took:" << took.milliseconds() << "\n";
 
@@ -349,6 +297,7 @@ key_count = key_count > 1000 ? 1000 : key_count;
 			std::cout << value << " ";
 
 		std::cout << std::endl;
+	#endif
 		}
 
 	auto took = JASS::timer::stop(search_time_stopwatch);
