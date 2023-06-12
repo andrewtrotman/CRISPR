@@ -156,7 +156,7 @@ forceinline __m512i popcnt_AVX512BW_lookup_original(__m512i vec)
 	return ret;
 	}
 
-__m512i hs512_popcount(const __m512i v)
+forceinline __m512i hs512_popcount(const __m512i v)
 	{
 	const __m512i m1 = _mm512_set1_epi8(0x55);
 	const __m512i m2 = _mm512_set1_epi8(0x33);
@@ -243,8 +243,8 @@ size_t at512_filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64
 		{
 		__m512i data = _mm512_loadu_si512((__m512i_u *)current);
 		__m512i xorResult = _mm512_xor_epi64(key, data);
-		__m512i counts = popcnt_AVX512BW_lookup_original(xorResult);
-//		__m512i counts = hs512_popcount(xorResult);
+//		__m512i counts = popcnt_AVX512BW_lookup_original(xorResult);
+		__m512i counts = hs512_popcount(xorResult);
 
 		__mmask8 triggers = _mm512_cmple_epi64_mask(counts, threshold);
 		_mm512_mask_compressstoreu_epi64(current_answer, triggers, data);
@@ -327,20 +327,17 @@ void process_512_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 			auto took = JASS::timer::stop(stopwatch);
 			std::cout << "Took:" << took.milliseconds() << "\n";
 
-#ifdef PRINT_RESULT
 			// Print the filtered and sorted results
 			uint64_t *end = result_set + found;
 			for (uint64_t *current  = result_set; current < end; current++)
 				std::cout << *current << " ";
 			std::cout << std::endl;
-#endif
 			}
 		delete [] result_set;
 	#else
 		puts("AXV512 not supported on this CPU");
 	#endif
 	}
-
 
 void process_256_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
 	{
@@ -355,13 +352,11 @@ void process_256_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 			auto took = JASS::timer::stop(stopwatch);
 			std::cout << "Took:" << took.milliseconds() << "\n";
 
-#ifdef PRINT_RESULT
 			// Print the filtered and sorted results
 			uint64_t *end = result_set + found;
 			for (uint64_t *current  = result_set; current < end; current++)
 				std::cout << *current << " ";
 			std::cout << std::endl;
-#endif
 			}
 		delete [] result_set;
 	#else
@@ -381,16 +376,12 @@ void process_64_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_
 		auto took = JASS::timer::stop(stopwatch);
 		std::cout << "Took:" << took.milliseconds() << "\n";
 
-#ifdef PRINT_RESULT
 		// Print the filtered and sorted results
 		for (auto value : filteredB)
 			std::cout << value << " ";
 		std::cout << std::endl;
-#endif
 		}
 	}
-
-
 
 int usage(const char *exename)
 	{
