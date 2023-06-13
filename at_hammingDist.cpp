@@ -25,6 +25,7 @@
 	#endif
 #endif
 
+#include <string.h>
 #include <immintrin.h>
 
 #include "timer.h"
@@ -421,9 +422,6 @@ int main(int argc, const char *argv[])
 
 	uint64_t key_count;
 	uint64_t *search_keys = read_search_keys("OSativaCandidates.txt", &key_count);
-
-if (key_count > 1000)
-	key_count  = 1000;
 
 	auto method = process_64_bits_wide;
 	if (bits_parallel == 64)
