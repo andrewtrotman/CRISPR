@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <bitset>
 #include <cstdint>
+#include <thread>
 
 #ifdef _MSC_VER
 	#define __m256i_u __m256i
@@ -118,7 +119,7 @@ forceinline uint64_t hammingDistance(uint64_t a, uint64_t b)
 //	return __popcnt64(xorResult);
 	}
 
-void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, uint64_t maxDistance, std::vector<uint64_t>& filteredB) {
+size_t filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, uint64_t maxDistance, std::vector<uint64_t>& filteredB) {
     // calculate the distance between a and every element in b, and return elements where dist(a,b)<maxDistance 
     filteredB.reserve(b.size());
 
@@ -130,6 +131,7 @@ void filterAndSortByHammingDistance(uint64_t a, const std::vector<uint64_t>& b, 
     }
 
     std::sort(filteredB.begin(), filteredB.end());
+    return filteredB.size();
 }
 
 #ifdef __AVX512F__
@@ -314,7 +316,7 @@ uint64_t read_encoded_data(std::vector<uint64_t> &into, const char *filename)
 	}
 
 
-void process_512_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
+void process_512_bits_wide(size_t *total, std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
 	{
 	#ifdef __AVX512F__
 		uint64_t *result_set = new uint64_t [encoded_data.size()];
@@ -322,9 +324,11 @@ void process_512_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 			{
 			uint64_t current_key = search_keys[key];
 
-			auto stopwatch = JASS::timer::start();
+//			auto stopwatch = JASS::timer::start();
 			size_t found = at512_filterAndSortByHammingDistance(current_key, encoded_data, maxDistance, result_set);
-			auto took = JASS::timer::stop(stopwatch);
+			*total += found;
+//			auto took = JASS::timer::stop(stopwatch);
+#ifdef PRINT_RESULT
 			std::cout << "Took:" << took.milliseconds() << "\n";
 
 			// Print the filtered and sorted results
@@ -332,6 +336,7 @@ void process_512_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 			for (uint64_t *current  = result_set; current < end; current++)
 				std::cout << *current << " ";
 			std::cout << std::endl;
+#endif
 			}
 		delete [] result_set;
 	#else
@@ -339,7 +344,7 @@ void process_512_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 	#endif
 	}
 
-void process_256_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
+void process_256_bits_wide(size_t *total, std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
 	{
 	#ifdef __AVX512F__
 		uint64_t *result_set = new uint64_t [encoded_data.size()];
@@ -347,9 +352,11 @@ void process_256_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 			{
 			uint64_t current_key = search_keys[key];
 
-			auto stopwatch = JASS::timer::start();
+//			auto stopwatch = JASS::timer::start();
 			size_t found = at_filterAndSortByHammingDistance(current_key, encoded_data, maxDistance, result_set);
-			auto took = JASS::timer::stop(stopwatch);
+			*total += found;
+//			auto took = JASS::timer::stop(stopwatch);
+#ifdef PRINT_RESULT
 			std::cout << "Took:" << took.milliseconds() << "\n";
 
 			// Print the filtered and sorted results
@@ -357,6 +364,7 @@ void process_256_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 			for (uint64_t *current  = result_set; current < end; current++)
 				std::cout << *current << " ";
 			std::cout << std::endl;
+#endif
 			}
 		delete [] result_set;
 	#else
@@ -364,28 +372,31 @@ void process_256_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search
 	#endif
 	}
 
-void process_64_bits_wide(std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
+void process_64_bits_wide(size_t *total, std::vector<uint64_t> &encoded_data, uint64_t *search_keys, uint64_t key_count, uint64_t maxDistance)
 	{
 	std::vector<uint64_t> filteredB;
 	for (uint64_t key = 0; key < key_count; key++)
 		{
 		uint64_t current_key = search_keys[key];
 		filteredB.clear();
-		auto stopwatch = JASS::timer::start();
-		filterAndSortByHammingDistance(current_key, encoded_data, maxDistance, filteredB);
-		auto took = JASS::timer::stop(stopwatch);
+//		auto stopwatch = JASS::timer::start();
+		size_t found = filterAndSortByHammingDistance(current_key, encoded_data, maxDistance, filteredB);
+		*total += found;
+//		auto took = JASS::timer::stop(stopwatch);
+#ifdef PRINT_RESULT
 		std::cout << "Took:" << took.milliseconds() << "\n";
 
 		// Print the filtered and sorted results
 		for (auto value : filteredB)
 			std::cout << value << " ";
 		std::cout << std::endl;
+#endif
 		}
 	}
 
 int usage(const char *exename)
 	{
-	printf("Usage:%s <64 | 256 | 512>", exename);
+	printf("Usage:%s <64 | 256 | 512> <threads>", exename);
 	return 1;
 	}
 
@@ -395,18 +406,24 @@ int main(int argc, const char *argv[])
 	long bits_parallel;
 	uint64_t maxDistance = 4;
 
-	if (argc != 2)
+	if (argc != 3)
 		exit(usage(argv[0]));
 
 	bits_parallel = atol(argv[1]);
 	if (bits_parallel != 64 && bits_parallel != 256 && bits_parallel != 512)
 		exit(usage(argv[0]));
 
+	size_t thread_count = atol(argv[2]);
+	thread_count = thread_count == 0 ? 1 : thread_count;
+
 	uint64_t line_count = read_encoded_data(b, "OryzaPacked20mers.txt");
 	line_count -= line_count % 8;		// so that we have a full number of SIMD registers
 
 	uint64_t key_count;
 	uint64_t *search_keys = read_search_keys("OSativaCandidates.txt", &key_count);
+
+if (key_count > 1000)
+	key_count  = 1000;
 
 	auto method = process_64_bits_wide;
 	if (bits_parallel == 64)
@@ -416,11 +433,27 @@ int main(int argc, const char *argv[])
 	else if (bits_parallel == 512)
 		method = process_512_bits_wide;
 
+	size_t individual_answers[thread_count];
+	memset(individual_answers, 0, sizeof(individual_answers));
+	size_t answer = 0;
+	uint64_t key_count_per_thread = key_count / thread_count;
+	uint64_t block_start = 0;
+	std::vector<std::thread> workers;
 	auto search_time_stopwatch = JASS::timer::start();
-	method(b, search_keys, key_count, maxDistance);
+	for (size_t which = 0; which < thread_count - 1; which++)
+		{
+		workers.push_back(std::thread(method, &individual_answers[which], std::ref(b), search_keys + block_start, key_count_per_thread, maxDistance));
+		block_start += key_count_per_thread;
+		}
+	workers.push_back(std::thread(method, &individual_answers[thread_count - 1], std::ref(b), search_keys + block_start, key_count - block_start, maxDistance));
+
+	for (std::thread &which: workers)
+		which.join();
+	for (size_t index = 0; index < thread_count; index++)
+		answer += individual_answers[index];
 	auto took = JASS::timer::stop(search_time_stopwatch);
-	std::cout << "TOTAL Took:" << took.milliseconds() << "\n";
+
+	std::cout << "Matches:" << answer << " TOTAL Time:" << took.milliseconds() << " milliseconds Threads:" << thread_count << "\n";
 
 	return 0;
 	}
-
