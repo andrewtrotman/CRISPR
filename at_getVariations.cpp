@@ -167,7 +167,7 @@ std::pair<std::vector<uint64_t>, std::vector<uint64_t>> packMasks(const std::vec
     return {changeMasks, preserveMasks};
 }
 
-size_t getVariations(uint64_t *variations, const std::vector<uint64_t>& changeMasks, const std::vector<uint64_t>& preserveMasks, const uint64_t kmer)
+size_t getVariations64(uint64_t *variations, const std::vector<uint64_t>& changeMasks, const std::vector<uint64_t>& preserveMasks, const uint64_t kmer)
 	{
 	uint64_t *into = variations;
 	for (std::size_t i = 0; i < changeMasks.size(); ++i)
@@ -205,8 +205,44 @@ size_t getVariations256(uint64_t *variations, const std::vector<uint64_t>& chang
 	return std::unique(variations, (uint64_t *)into) - variations;
 	}
 
-int main()
+size_t getVariations512(uint64_t *variations, const std::vector<uint64_t>& changeMasks, const std::vector<uint64_t>& preserveMasks, const uint64_t kmer)
 	{
+	__m512i *into = (__m512i *)variations;
+
+	__m512i kmer_512 = _mm512_set1_epi64(kmer);
+
+	for (std::size_t i = 0; i < changeMasks.size(); i += 8)
+		{
+		__m512i preserve_mask = _mm512_load_si512((__m512i *)&preserveMasks[i]);
+		__m512i change_mask = _mm512_load_si512((__m512i *)&changeMasks[i]);
+
+		__m512i variation = _mm512_or_si512(_mm512_and_si512(kmer_512, preserve_mask), change_mask);
+		_mm512_store_si512(into, variation);
+
+		into++;
+		}
+
+	// Sort and remove duplicates
+	std::sort(variations, (uint64_t *)into);
+	return std::unique(variations, (uint64_t *)into) - variations;
+	}
+
+int usage(const char *exename)
+	{
+	printf("Usage:%s <64 | 256 | 512>", exename);
+	return 1;
+	}
+
+int main(int argc, const char *argv[])
+	{
+	if (argc != 2)
+		exit(usage(argv[0]));
+
+	long bits_wide;
+	bits_wide = atol(argv[1]);
+	if (bits_wide != 64 && bits_wide != 256 && bits_wide != 512)
+		exit(usage(argv[0]));
+
 	std::cout << "Generating masks" << std::endl;
 	auto start = std::chrono::high_resolution_clock::now(); // Start timing
 
@@ -231,10 +267,18 @@ int main()
 	start = std::chrono::high_resolution_clock::now(); // Start timing
 
 
-	uint64_t *variations = new uint64_t[masks.size()];
-	size_t variations_size = getVariations(variations, changeMasks, preserveMasks, packedKmer);
-	//    std::unordered_set<uint64_t> variations = getVariations(changeMasks, preserveMasks, packedKmer);
+	auto method = getVariations64;
+	if (bits_wide == 64)
+		method = getVariations64;
+	else if (bits_wide == 256)
+		method = getVariations256;
+	else if (bits_wide == 512)
+		method = getVariations512;
 
+	uint64_t *variations = new uint64_t[masks.size()];
+
+	size_t variations_size = method(variations, changeMasks, preserveMasks, packedKmer);
+	
 	end = std::chrono::high_resolution_clock::now(); // End timing
 	duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
