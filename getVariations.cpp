@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+#include <chrono>
 
 
 // Function to convert a 20mer sequence to its packed representation

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+#include <chrono>
 #include <immintrin.h>
 
 
@@ -184,26 +185,24 @@ size_t getVariations(uint64_t *variations, const std::vector<uint64_t>& changeMa
 
 size_t getVariations256(uint64_t *variations, const std::vector<uint64_t>& changeMasks, const std::vector<uint64_t>& preserveMasks, const uint64_t kmer)
 	{
-	uint64_t *into = variations;
+	__m256i *into = (__m256i *)variations;
 
 	__m256i kmer_256 = _mm256_set1_epi64x(kmer);
 
 	for (std::size_t i = 0; i < changeMasks.size(); i += 4)
 		{
-		__m256i preserve_mask =  (__m256i)_mm256_load_pd((double *)preserveMasks[i]);
-		__m256i change_mask =  (__m256i)_mm256_load_pd((double *)changeMasks[i]);
+		__m256i preserve_mask = _mm256_load_si256((__m256i *)&preserveMasks[i]);
+		__m256i change_mask = _mm256_load_si256((__m256i *)&changeMasks[i]);
 
 		__m256i variation = _mm256_or_si256(_mm256_and_si256(kmer_256, preserve_mask), change_mask);
-		_mm256_store_pd((double *)into, (__m256d)variation);
+		_mm256_store_si256(into, variation);
 
-		variation += sizeof(kmer_256);
+		into++;
 		}
 
 	// Sort and remove duplicates
-	std::sort(variations, into);
-	into = std::unique(variations, into);
-
-	return into - variations;
+	std::sort(variations, (uint64_t *)into);
+	return std::unique(variations, (uint64_t *)into) - variations;
 	}
 
 int main()
