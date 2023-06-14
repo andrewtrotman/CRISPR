@@ -207,16 +207,18 @@ size_t getVariations256(uint64_t *variations, const std::vector<uint64_t>& chang
 	return std::unique(variations, (uint64_t *)into) - variations;
 	}
 
+
 size_t getVariations512(uint64_t *variations, const std::vector<uint64_t>& changeMasks, const std::vector<uint64_t>& preserveMasks, const uint64_t kmer)
 	{
 	__m512i *into = (__m512i *)variations;
-
 	__m512i kmer_512 = _mm512_set1_epi64(kmer);
+	__m512i *cm, *pm;
 
-	for (std::size_t i = 0; i < changeMasks.size(); i += 8)
+	__m512i *end = (__m512i *)&preserveMasks[preserveMasks.size()];
+	for (pm = (__m512i *)&preserveMasks[0], cm = (__m512i *)&changeMasks[0]; pm < end; pm++, cm++)
 		{
-		__m512i preserve_mask = _mm512_load_si512((__m512i *)&preserveMasks[i]);
-		__m512i change_mask = _mm512_load_si512((__m512i *)&changeMasks[i]);
+		__m512i preserve_mask = _mm512_load_si512(pm);
+		__m512i change_mask = _mm512_load_si512(cm);
 
 		__m512i variation = _mm512_or_si512(_mm512_and_si512(kmer_512, preserve_mask), change_mask);
 		_mm512_store_si512(into, variation);
