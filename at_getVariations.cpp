@@ -174,8 +174,14 @@ size_t getVariations64(uint64_t *variations, const std::vector<uint64_t>& change
 	const uint64_t *cm, *pm;
 	const uint64_t *end = &preserveMasks[preserveMasks.size()];
 
-	for (pm = (const uint64_t *)&preserveMasks[0], cm = (const uint64_t *)&changeMasks[0]; pm < end; pm++, cm++)
-		*into++ = (kmer & *pm) | *cm;
+	for (pm = (const uint64_t *)&preserveMasks[0], cm = (const uint64_t *)&changeMasks[0]; pm < end; pm += 4, cm += 4)
+		{
+		into[0] = (kmer & pm[0]) | cm[0];
+		into[1] = (kmer & pm[1]) | cm[1];
+		into[2] = (kmer & pm[2]) | cm[2];
+		into[3] = (kmer & pm[3]) | cm[3];
+		into += 4;
+		}
 
 	// Sort and remove duplicates
 	std::sort(variations, into);
@@ -268,7 +274,6 @@ int main(int argc, const char *argv[])
 	std::string kmer = "ACGTTGCATTAAGGCCGGAC";
 	uint64_t packedKmer = pack20mer(kmer);
 
-	start = std::chrono::high_resolution_clock::now(); // Start timing
 
 	auto method = getVariations64;
 	if (bits_wide == 64)
@@ -278,12 +283,11 @@ int main(int argc, const char *argv[])
 	else if (bits_wide == 512)
 		method = getVariations512;
 
+	start = std::chrono::high_resolution_clock::now(); // Start timing
 	__m512i *variations_aligned = new __m512i[masks.size() / 8 + 1];
 	uint64_t *variations = (uint64_t *)variations_aligned;
 
-
 	size_t variations_size = method(variations, changeMasks, preserveMasks, packedKmer);
-	
 	end = std::chrono::high_resolution_clock::now(); // End timing
 	duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 

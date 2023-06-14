@@ -7,7 +7,7 @@ at_getVariations : at_getVariations.cpp
 	g++ -std=c++17 -O3 -Wall -mavx2 -mavx512f -march=native at_getVariations.cpp -o at_getVariations
 
 getVariations : getVariations.cpp 
-	g++ -std=c++14 -O3 -Wall -march=native getVariations.cpp -o getVariations
+	g++ -std=c++17 -O3 -Wall -mavx2 -mavx512f -march=native getVariations.cpp -o getVariations
 
 clean :
 	rm at_hammingDist at_getVariations getVariations
