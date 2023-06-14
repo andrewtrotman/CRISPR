@@ -171,11 +171,11 @@ std::pair<std::vector<uint64_t>, std::vector<uint64_t>> packMasks(const std::vec
 size_t getVariations64(uint64_t *variations, const std::vector<uint64_t>& changeMasks, const std::vector<uint64_t>& preserveMasks, const uint64_t kmer)
 	{
 	uint64_t *into = variations;
-	for (std::size_t i = 0; i < changeMasks.size(); ++i)
-		{
-		const uint64_t variation = (kmer & preserveMasks[i]) | changeMasks[i];
-		*into++ = variation;
-		}
+	const uint64_t *cm, *pm;
+	const uint64_t *end = &preserveMasks[preserveMasks.size()];
+
+	for (pm = (const uint64_t *)&preserveMasks[0], cm = (const uint64_t *)&changeMasks[0]; pm < end; pm++, cm++)
+		*into++ = (kmer & *pm) | *cm;
 
 	// Sort and remove duplicates
 	std::sort(variations, into);
