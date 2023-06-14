@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <chrono>
+#include <new>
 #include <immintrin.h>
 
 
@@ -187,11 +188,13 @@ size_t getVariations256(uint64_t *variations, const std::vector<uint64_t>& chang
 	{
 	__m256i *into = (__m256i *)variations;
 	__m256i kmer_256 = _mm256_set1_epi64x(kmer);
+	__m256i *cm, *pm;
 
-	for (std::size_t i = 0; i < changeMasks.size(); i += 4)
+	__m256i *end = (__m256i *)&preserveMasks[preserveMasks.size()];
+	for (pm = (__m256i *)&preserveMasks[0], cm = (__m256i *)&changeMasks[0]; pm < end; pm++, cm++)
 		{
-		__m256i preserve_mask = _mm256_load_si256((__m256i *)&preserveMasks[i]);
-		__m256i change_mask = _mm256_load_si256((__m256i *)&changeMasks[i]);
+		__m256i preserve_mask = _mm256_load_si256(pm);
+		__m256i change_mask = _mm256_load_si256(cm);
 
 		__m256i variation = _mm256_or_si256(_mm256_and_si256(kmer_256, preserve_mask), change_mask);
 		_mm256_store_si256(into, variation);
@@ -273,7 +276,9 @@ int main(int argc, const char *argv[])
 	else if (bits_wide == 512)
 		method = getVariations512;
 
-	uint64_t *variations = new ((std::align_val_t(sizeof(__m512i)))) uint64_t[masks.size()];
+	__m512i *variations_aligned = new __m512i[masks.size() / 8 + 1];
+	uint64_t *variations = (uint64_t *)variations_aligned;
+
 
 	size_t variations_size = method(variations, changeMasks, preserveMasks, packedKmer);
 	
