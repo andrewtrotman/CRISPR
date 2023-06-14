@@ -113,7 +113,7 @@ std::vector<std::string> generateMasks(const std::vector<std::vector<int>>& posi
         for (const auto& choice : choices) {
             std::string mask(20, '.');
 
-            for (int j = 0; j < positionSet.size(); ++j) {
+            for (unsigned int j = 0; j < positionSet.size(); ++j) {
                 int position = positionSet[j];
                 char base = choice[j];
                 mask[position - 1] = base;
@@ -134,7 +134,7 @@ std::pair<std::vector<uint64_t>, std::vector<uint64_t>> packMasks(const std::vec
         uint64_t changeMask = 0;
         uint64_t preserveMask = 0x0FFFFFFFFFFFFFFFULL;
 
-        for (int i = 0; i < mask.size(); ++i) {
+        for (unsigned int i = 0; i < mask.size(); ++i) {
             char base = mask[i];
 
             if (base != '.') {
@@ -186,7 +186,6 @@ size_t getVariations64(uint64_t *variations, const std::vector<uint64_t>& change
 size_t getVariations256(uint64_t *variations, const std::vector<uint64_t>& changeMasks, const std::vector<uint64_t>& preserveMasks, const uint64_t kmer)
 	{
 	__m256i *into = (__m256i *)variations;
-
 	__m256i kmer_256 = _mm256_set1_epi64x(kmer);
 
 	for (std::size_t i = 0; i < changeMasks.size(); i += 4)
@@ -266,7 +265,6 @@ int main(int argc, const char *argv[])
 
 	start = std::chrono::high_resolution_clock::now(); // Start timing
 
-
 	auto method = getVariations64;
 	if (bits_wide == 64)
 		method = getVariations64;
@@ -275,7 +273,7 @@ int main(int argc, const char *argv[])
 	else if (bits_wide == 512)
 		method = getVariations512;
 
-	uint64_t *variations = new uint64_t[masks.size()];
+	uint64_t *variations = new ((std::align_val_t(sizeof(__m512i)))) uint64_t[masks.size()];
 
 	size_t variations_size = method(variations, changeMasks, preserveMasks, packedKmer);
 	
@@ -288,5 +286,6 @@ int main(int argc, const char *argv[])
 
 	std::cout << "Time taken: " << duration << " microseconds" << std::endl;
 
+	delete [] variations;
 	return 0;
 	}
