@@ -194,6 +194,18 @@ uint64_t pack20mer(const std::string& sequence) {
     return packedSequence;
 }
 
+uint64_t pack20mer(const char *sequence)
+	{
+	uint64_t packedSequence = 0;
+	for (int i = 0; i < 20; i++)
+		{
+		uint64_t baseEncoding = encodingTable[sequence[i]];
+		packedSequence = (packedSequence << 3) | baseEncoding;
+		}
+	return packedSequence;
+	}
+
+
 // Function to convert a packed uint64_t sequence to its 20mer representation
 std::string unpack20mer(uint64_t packedSequence) {
     std::string sequence;
@@ -222,21 +234,68 @@ std::string unpack20mer(uint64_t packedSequence) {
     return sequence;
 }
 
-// Function to load sequences from a file into a vector
-std::vector<std::string> loadSequencesFromFile(const std::string& filename) {
-    std::vector<std::string> sequences;
-    std::ifstream file(filename);
-    if (file.is_open()) {
-        std::string line;
-        while (std::getline(file, line)) {
-            if (line.size() == 20) {
-                sequences.push_back(line);
-            }
-        }
-        file.close();
-    }
-    return sequences;
+
+char *read_entire_file(const char *filename)
+	{
+	FILE *fp;
+	struct stat details;
+	char *contents = NULL;
+
+	if ((fp = fopen(filename, "rb")) != NULL)
+		{
+		if (fstat(fileno(fp), &details) == 0)
+			if (details.st_size != 0)
+				{
+				contents = (char *)malloc(details.st_size);
+				if (fread(contents, details.st_size, 1, fp) != 1)
+					{
+					free(contents);
+					contents = NULL;
+					}
+				}
+		fclose(fp);
+		}
+return contents;
 }
+// Function to load sequences from a file into a vector
+#ifdef NEVER
+	std::vector<std::string> loadSequencesFromFile(const std::string& filename) {
+		 std::vector<std::string> sequences;
+		 std::ifstream file(filename);
+		 if (file.is_open()) {
+			  std::string line;
+			  while (std::getline(file, line)) {
+					if (line.size() == 20) {
+						 sequences.push_back(line);
+					}
+			  }
+			  file.close();
+		 }
+		 return sequences;
+	}
+#else
+	/*
+		LOADSEQUENCESFROMFILE()
+		-----------------------
+	*/
+	std::vector<std::string> loadSequencesFromFile(const std::string& filename)
+		{
+		std::vector<std::string> sequences;
+		char *data = read_entire_file(filename.c_str());
+		char *start = data;
+		char *eoln;
+		if (data != NULL)
+			{
+			eoln = strchr(start, '\n');
+			if (eoln != NULL)
+				if (eoln - start == 20)
+					sequences.push_back(std::string(start, 20));
+			}
+		free(data);
+		return sequences;
+		}
+#endif
+
 
 std::vector<uint64_t> loadPackedGenomeGuidesFromFile(const std::string& filename) {
     std::vector<uint64_t> packedGenomeGuides;
@@ -249,34 +308,64 @@ std::vector<uint64_t> loadPackedGenomeGuidesFromFile(const std::string& filename
     return packedGenomeGuides;
 }
 
-std::vector<uint64_t> loadGuidesFromFile(const std::string& filename) {
-    std::vector<uint64_t> packedGenomeGuides;
-    std::ifstream guideFile(filename);
-    if (!guideFile.is_open()) {
-        std::cerr << "Error opening guide file." << std::endl;
-        exit(1);
-    }
+#ifndef NEVER
+	std::vector<uint64_t> loadGuidesFromFile(const std::string& filename) {
+		 std::vector<uint64_t> packedGenomeGuides;
+		 std::ifstream guideFile(filename);
+		 if (!guideFile.is_open()) {
+			  std::cerr << "Error opening guide file." << std::endl;
+			  exit(1);
+		 }
     
-    std::string line;
-    while (std::getline(guideFile, line)) {
-        std::istringstream iss(line);
-        std::string guide;
-        uint64_t packedGuide;
-        int sequenceNumber, startPosition;
-//        std::cout << line << std::endl;
+		 std::string line;
+		 while (std::getline(guideFile, line)) {
+			  std::istringstream iss(line);
+			  std::string guide;
+			  uint64_t packedGuide;
+			  int sequenceNumber, startPosition;
+	//        std::cout << line << std::endl;
         
-        if (iss >> guide >> sequenceNumber >> startPosition) {
-            // Process the extracted guide, sequenceNumber, and startPosition
-            packedGuide = pack20mer(guide);
-            packedGenomeGuides.push_back(packedGuide);
-        } else {
-            std::cerr << "Error parsing line: " << line << std::endl;
-            exit(2);
-        }
-     }
-    std::sort(packedGenomeGuides.begin(),packedGenomeGuides.end());
-    return packedGenomeGuides;
-}
+			  if (iss >> guide >> sequenceNumber >> startPosition) {
+					// Process the extracted guide, sequenceNumber, and startPosition
+					packedGuide = pack20mer(guide);
+					packedGenomeGuides.push_back(packedGuide);
+			  } else {
+					std::cerr << "Error parsing line: " << line << std::endl;
+					exit(2);
+			  }
+		  }
+		 std::sort(packedGenomeGuides.begin(),packedGenomeGuides.end());
+		 return packedGenomeGuides;
+	}
+#else
+	std::vector<uint64_t> loadGuidesFromFile(const std::string& filename)
+		{
+		std::vector<uint64_t> packedGenomeGuides;
+		char *guide;
+		char *space;
+		char *data = read_entire_file(filename.c_str());
+		if (data == NULL)
+			{
+			std::cerr << "Error opening guide file." << std::endl;
+			exit(1);
+			}
+		
+		guide = data - 1;
+		do
+			{
+			guide++;
+			packedGenomeGuides.push_back(pack20mer(guide));
+			guide = strchr(guide, '\n');
+			}
+		while (guide != NULL && *(guide + 1) != '\0');
+
+		std::sort(packedGenomeGuides.begin(),packedGenomeGuides.end());
+		free(data);
+		return packedGenomeGuides;
+		}
+
+#endif
+
 
 // Function to generate variations with 0 to 4 replacements away from a given 20mer
 void generateVariations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0) {
@@ -356,8 +445,13 @@ int main() {
     //    std::vector<uint64_t> packedGenomeGuides = loadPackedGenomeGuidesFromFile(genomeGuidesFilename);
     
     std::string GuidesFilename = "OryzaSativaGuides.txt";
+
+    auto load_guided_from_file_start = std::chrono::steady_clock::now();
     std::vector<uint64_t> packedGenomeGuides = loadGuidesFromFile(GuidesFilename);
-    
+    auto load_guided_from_file_end = std::chrono::steady_clock::now();
+    auto load_guided_from_file_duration = std::chrono::duration_cast<std::chrono::microseconds>(load_guided_from_file_end - load_guided_from_file_start).count();
+    std::cout << "loadGuidesFromFile: " << load_guided_from_file_duration/1000000.001 << " seconds" << std::endl;
+
     /* load test guides */
     
     //    std::string inputSequencesFilename = "/Users/geva/Crispr/testGuides.txt";
@@ -387,7 +481,7 @@ int main() {
     {
         // Define the number of threads to use for parallel execution
         int numThreads = std::thread::hardware_concurrency();
-        numThreads=128;
+//        numThreads=128;
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
         
