@@ -405,6 +405,7 @@ void generateVariations_binary(uint64_t sequence, std::vector<uint64_t>& variati
 				}
 		}
 	}
+
 void generateVariations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
 	{
 	generateVariations_binary(pack20mer(sequence), variations, replacements, position);
@@ -557,7 +558,6 @@ int main() {
         // Define the number of threads to use for parallel execution
         int numThreads = std::thread::hardware_concurrency();
 //        numThreads=128;
-        numThreads=1;
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
         
