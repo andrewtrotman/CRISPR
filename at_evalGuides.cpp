@@ -366,7 +366,7 @@ std::vector<uint64_t> loadPackedGenomeGuidesFromFile(const std::string& filename
 
 #endif
 
-
+#ifdef NEVER
 // Function to generate variations with 0 to 4 replacements away from a given 20mer
 void generateVariations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0) {
     if (replacements > 4) {
@@ -385,6 +385,81 @@ void generateVariations(std::string& sequence, std::vector<uint64_t>& variations
         }
     }
 }
+#else
+// Function to generate variations with 0 to 4 replacements away from a given 20mer
+void generateVariations_binary(uint64_t sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
+	{
+	if (replacements > 4)
+		return;
+
+	variations.push_back(sequence);
+	for (uint64_t i = position; i < 20; i++)
+		{
+		uint64_t was = (sequence >> (i * 3)) & 7;
+		uint64_t knock_out = (sequence & ~(7ULL << (i * 3)));
+		for (uint64_t base : {1ULL, 2ULL, 4ULL, 7ULL})
+			if (was != base)
+				{
+				uint64_t new_sequence = knock_out | (base << (i * 3));
+				generateVariations_binary(new_sequence, variations, replacements + 1, i + 1);
+				}
+		}
+	}
+void generateVariations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
+	{
+	generateVariations_binary(pack20mer(sequence), variations, replacements, position);
+	}
+
+
+
+	#ifdef NEVER
+	// Function to generate variations with 0 to 4 replacements away from a given 20mer
+	void generateVariations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
+	{
+	puts("ASPT generateVariations");
+	std::vector<std::vector<int>> positionSets;
+
+	uint64_t encoded_sequence = pack20mer(sequence);
+	uint64_t new_sequence;
+	const uint64_t base_encodings[] = {1, 2, 4, 7};//        // 0 for invalid bases, 1 for 'A', 2 for 'C', 4 for 'G', 7 for 'T'
+
+	for (int i = 0; i < 17; i++)
+		{
+		uint64_t new_mask = encoded_sequence & ~(7ULL << i * 3);
+		for (int base = 0; base < 4; base++)
+			{
+			uint64_t encoded_sequence = new_mask | (base_encodings[base] << i * 3);
+			for (int j = i + 1; j < 18; j++)
+				{
+				uint64_t new_mask = encoded_sequence & ~(7ULL << j * 3);
+				for (int base = 0; base < 4; base++)
+					{
+					uint64_t encoded_sequence = new_mask | (base_encodings[base] << j * 3);
+					for (int k = j + 1; k < 19; k++)
+						{
+						uint64_t new_mask = encoded_sequence & ~(7ULL << k * 3);
+						for (int base = 0; base < 4; base++)
+							{
+							uint64_t encoded_sequence = new_mask | (base_encodings[base] << k * 3);
+							for (int l = k + 1; l < 20; l++)
+								{
+								uint64_t new_mask = encoded_sequence & ~(7ULL << l * 3);
+								for (int base = 0; base < 4; base++)
+									{
+									uint64_t encoded_sequence = new_mask | (base_encodings[base] << l * 3);
+									variations.push_back(encoded_sequence);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	#endif
+
+#endif
 
 // Function to generate variations with 0 to 4 replacements away from a given 20mer
 int generateVariations2(std::string& sequence, std::vector<uint64_t>& variations, int index, int replacements = 0, int position = 0) {
@@ -482,6 +557,7 @@ int main() {
         // Define the number of threads to use for parallel execution
         int numThreads = std::thread::hardware_concurrency();
 //        numThreads=128;
+        numThreads=1;
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
         
@@ -497,7 +573,21 @@ int main() {
 //                generateVariations2(testGuides[i], variations, 0, 0, 0);
                 
                 std::vector<uint64_t> variations;
+				    auto generateVariations_start = std::chrono::steady_clock::now();
                 generateVariations(testGuides[i], variations, 0, 0);
+					 auto generateVariations_end = std::chrono::steady_clock::now();
+					 auto generateVariations_duration = std::chrono::duration_cast<std::chrono::microseconds>(generateVariations_end - generateVariations_start).count();
+					 std::cout << "generateVariations: " << generateVariations_duration/1000000.001 << " seconds" << std::endl;
+
+
+
+std::cout << "BASED ON:" << testGuides[i] << "\n";
+for (const auto x : variations)
+	{
+	std::cout << x << '\n';
+	}
+exit(0);
+
 
                 variations.erase(variations.begin());
                 std::sort(variations.begin(), variations.end());
