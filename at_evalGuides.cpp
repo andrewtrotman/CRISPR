@@ -597,13 +597,21 @@ int main() {
 //					 auto generateVariations_duration = std::chrono::duration_cast<std::chrono::microseconds>(generateVariations_end - generateVariations_start).count();
 //					 std::cout << "generateVariations: " << generateVariations_duration/1000000.001 << " seconds" << std::endl;
 
+#ifdef NEVER
                 variations.erase(variations.begin());
                 std::sort(variations.begin(), variations.end());
+#else
+                std::sort(variations.begin() + 1, variations.end());
+#endif
                 
                 std::vector<uint64_t> matches;
                 std::vector<size_t> positions;
                 //            auto start4 = std::chrono::steady_clock::now(); // Start timing
+#ifdef NEVER
                 compute_intersection_list(variations.data(), variations.size(), packedGenomeGuides.data(), packedGenomeGuides.size(), matches, positions);
+#else
+                compute_intersection_list(variations.data() + 1, variations.size() - 1, packedGenomeGuides.data(), packedGenomeGuides.size(), matches, positions);
+#endif
                 //            auto end4 = std::chrono::steady_clock::now(); // End timing
                 //            auto duration4 = std::chrono::duration_cast<std::chrono::microseconds>(end4 - start4).count();
                 //            std::cout << "Intersection Execution time: " << duration4/1000000.001 << " seconds" << std::endl;
