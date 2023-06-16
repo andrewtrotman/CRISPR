@@ -308,7 +308,7 @@ std::vector<uint64_t> loadPackedGenomeGuidesFromFile(const std::string& filename
     return packedGenomeGuides;
 }
 
-#ifndef NEVER
+#ifdef NEVER
 	std::vector<uint64_t> loadGuidesFromFile(const std::string& filename) {
 		 std::vector<uint64_t> packedGenomeGuides;
 		 std::ifstream guideFile(filename);
@@ -397,12 +397,29 @@ void generateVariations_binary(uint64_t sequence, std::vector<uint64_t>& variati
 		{
 		uint64_t was = (sequence >> (i * 3)) & 7;
 		uint64_t knock_out = (sequence & ~(7ULL << (i * 3)));
-		for (uint64_t base : {1ULL, 2ULL, 4ULL, 7ULL})
-			if (was != base)
-				{
-				uint64_t new_sequence = knock_out | (base << (i * 3));
-				generateVariations_binary(new_sequence, variations, replacements + 1, i + 1);
-				}
+		switch(was)
+			{
+			case 1:
+				generateVariations_binary(knock_out | (2 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (4 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (7 << (i * 3)), variations, replacements + 1, i + 1);
+				break;
+			case 2:
+				generateVariations_binary(knock_out | (1 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (4 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (7 << (i * 3)), variations, replacements + 1, i + 1);
+				break;
+			case 4:
+				generateVariations_binary(knock_out | (1 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (2 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (7 << (i * 3)), variations, replacements + 1, i + 1);
+				break;
+			case 7:
+				generateVariations_binary(knock_out | (1 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (2 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (4 << (i * 3)), variations, replacements + 1, i + 1);
+				break;
+			}
 		}
 	}
 
@@ -558,6 +575,7 @@ int main() {
         // Define the number of threads to use for parallel execution
         int numThreads = std::thread::hardware_concurrency();
 //        numThreads=128;
+
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
         
@@ -573,21 +591,11 @@ int main() {
 //                generateVariations2(testGuides[i], variations, 0, 0, 0);
                 
                 std::vector<uint64_t> variations;
-				    auto generateVariations_start = std::chrono::steady_clock::now();
+//				    auto generateVariations_start = std::chrono::steady_clock::now();
                 generateVariations(testGuides[i], variations, 0, 0);
-					 auto generateVariations_end = std::chrono::steady_clock::now();
-					 auto generateVariations_duration = std::chrono::duration_cast<std::chrono::microseconds>(generateVariations_end - generateVariations_start).count();
-					 std::cout << "generateVariations: " << generateVariations_duration/1000000.001 << " seconds" << std::endl;
-
-
-
-std::cout << "BASED ON:" << testGuides[i] << "\n";
-for (const auto x : variations)
-	{
-	std::cout << x << '\n';
-	}
-exit(0);
-
+//					 auto generateVariations_end = std::chrono::steady_clock::now();
+//					 auto generateVariations_duration = std::chrono::duration_cast<std::chrono::microseconds>(generateVariations_end - generateVariations_start).count();
+//					 std::cout << "generateVariations: " << generateVariations_duration/1000000.001 << " seconds" << std::endl;
 
                 variations.erase(variations.begin());
                 std::sort(variations.begin(), variations.end());
