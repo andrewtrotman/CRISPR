@@ -13,6 +13,12 @@
 #include <sstream>
 #include <random>
 
+#ifdef __APPLE__
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <unistd.h>
+#endif
+
 // Declare mutexes for synchronization
 std::mutex matchesMutex;
 std::mutex positionsMutex;
@@ -188,7 +194,7 @@ void compute_intersection_list(const uint64_t* A, size_t sizeA, const uint64_t* 
 uint64_t pack20mer(const std::string& sequence) {
     uint64_t packedSequence = 0;
     for (int i = 0; i < 20; i++) {
-        uint64_t baseEncoding = encodingTable[sequence[i]];
+        uint64_t baseEncoding = encodingTable[(size_t)sequence[i]];
         packedSequence = (packedSequence << 3) | baseEncoding;
     }
     return packedSequence;
@@ -199,7 +205,7 @@ uint64_t pack20mer(const char *sequence)
 	uint64_t packedSequence = 0;
 	for (int i = 0; i < 20; i++)
 		{
-		uint64_t baseEncoding = encodingTable[sequence[i]];
+		uint64_t baseEncoding = encodingTable[(size_t)sequence[i]];
 		packedSequence = (packedSequence << 3) | baseEncoding;
 		}
 	return packedSequence;
@@ -342,11 +348,10 @@ std::vector<uint64_t> loadPackedGenomeGuidesFromFile(const std::string& filename
 		{
 		std::vector<uint64_t> packedGenomeGuides;
 		char *guide;
-		char *space;
 		char *data = read_entire_file(filename.c_str());
 		if (data == NULL)
 			{
-			std::cerr << "Error opening guide file." << std::endl;
+			std::cerr << "Error opening guide file: " << filename << std::endl;
 			exit(1);
 			}
 		
@@ -366,58 +371,88 @@ std::vector<uint64_t> loadPackedGenomeGuidesFromFile(const std::string& filename
 
 #endif
 
-#ifdef NEVER
+#ifndef NEVER
 // Function to generate variations with 0 to 4 replacements away from a given 20mer
+
 void generateVariations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0) {
-    if (replacements > 4) {
-        return;
-    }
-    char originalBase;
-    variations.push_back(pack20mer(sequence));
-    for (int i = position; i < 20; i++) {
-        for (char base : {'A', 'C', 'G', 'T'}) {
-            if (sequence[i] != base) {
-                originalBase = sequence[i];  // Store the original base value
-                sequence[i] = base;  // Modify the base in 'modifiedSequence'
-                generateVariations(sequence, variations, replacements + 1, i + 1);
-                sequence[i] = originalBase;  // Restore the original base value
-            }
-        }
-    }
+	variations.push_back(pack20mer(sequence.c_str()));
+	if (replacements==4)
+		return;
+	char originalBase;
+	for (int i = position; i < 20; i++) {
+		for (char base : {'A', 'C', 'G', 'T'}) {
+			if (sequence[i] != base) {
+				originalBase = sequence[i]; // Store the original base value
+				sequence[i] = base; // Modify the base in ‘modifiedSequence’
+				generateVariations(sequence, variations, replacements + 1, i + 1);
+				sequence[i] = originalBase; // Restore the original base value
+			}
+		}
+	}
 }
+
+
 #else
-// Function to generate variations with 0 to 4 replacements away from a given 20mer
+/*
 void generateVariations_binary(uint64_t sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
 	{
-	if (replacements > 4)
-		return;
-
+	//  if (replacements > 4)
+	//    return;
 	variations.push_back(sequence);
+	if (replacements == 4)
+		return;
 	for (uint64_t i = position; i < 20; i++)
 		{
-		uint64_t was = (sequence >> (i * 3)) & 7;
-		uint64_t knock_out = (sequence & ~(7ULL << (i * 3)));
+		uint64_t shifter = (19 - i) * 3;
+		uint64_t was = (sequence >> shifter) & 7;
+		uint64_t knock_out = (sequence & ~(7ULL << shifter));
+		for (uint64_t base : {1ULL, 2ULL, 4ULL, 7ULL})
+			{
+			if (was != base)
+				{
+				uint64_t new_sequence = knock_out | (base << shifter);
+				generateVariations_binary(new_sequence, variations, replacements + 1, (int) i + 1);
+				}
+			}
+		}
+	}
+*/
+
+
+// Function to generate variations with 0 to 4 replacements away from a given 20mer
+
+void generateVariations_binary(uint64_t sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
+	{
+	variations.push_back(sequence);
+	if (replacements == 4)
+		return;
+	for (uint64_t i = position; i < 20; i++)
+		{
+		uint64_t shifter = (19 - i) * 3;
+
+		uint64_t was = (sequence >> shifter) & 7;
+		uint64_t knock_out = (sequence & ~(7ULL << shifter));
 		switch(was)
 			{
 			case 1:
-				generateVariations_binary(knock_out | (2 << (i * 3)), variations, replacements + 1, i + 1);
-				generateVariations_binary(knock_out | (4 << (i * 3)), variations, replacements + 1, i + 1);
-				generateVariations_binary(knock_out | (7 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (2ULL << shifter), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (4ULL << shifter), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (7ULL << shifter), variations, replacements + 1, i + 1);
 				break;
 			case 2:
-				generateVariations_binary(knock_out | (1 << (i * 3)), variations, replacements + 1, i + 1);
-				generateVariations_binary(knock_out | (4 << (i * 3)), variations, replacements + 1, i + 1);
-				generateVariations_binary(knock_out | (7 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (1ULL << shifter), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (4ULL << shifter), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (7ULL << shifter), variations, replacements + 1, i + 1);
 				break;
 			case 4:
-				generateVariations_binary(knock_out | (1 << (i * 3)), variations, replacements + 1, i + 1);
-				generateVariations_binary(knock_out | (2 << (i * 3)), variations, replacements + 1, i + 1);
-				generateVariations_binary(knock_out | (7 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (1ULL << shifter), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (2ULL << shifter), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (7ULL << shifter), variations, replacements + 1, i + 1);
 				break;
 			case 7:
-				generateVariations_binary(knock_out | (1 << (i * 3)), variations, replacements + 1, i + 1);
-				generateVariations_binary(knock_out | (2 << (i * 3)), variations, replacements + 1, i + 1);
-				generateVariations_binary(knock_out | (4 << (i * 3)), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (1ULL << shifter), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (2ULL << shifter), variations, replacements + 1, i + 1);
+				generateVariations_binary(knock_out | (4ULL << shifter), variations, replacements + 1, i + 1);
 				break;
 			}
 		}
@@ -526,10 +561,10 @@ int main() {
     // 0 for invalid bases, 1 for 'A', 2 for 'C', 4 for 'G', 7 for 'T'
     // Note: Make sure to initialize the unused entries to 0
     // for (int i = 0; i < 256; i++) encodingTable[i] = 0; (if necessary)
-    encodingTable['A'] = 1;
-    encodingTable['C'] = 2;
-    encodingTable['G'] = 4;
-    encodingTable['T'] = 7;
+    encodingTable[(size_t)'A'] = 1;
+    encodingTable[(size_t)'C'] = 2;
+    encodingTable[(size_t)'G'] = 4;
+    encodingTable[(size_t)'T'] = 7;
 
     std::cout << "Loading test guides and genome guides" <<  std::endl;
     /* load genome guide */
@@ -555,7 +590,7 @@ int main() {
 
     // select test guides at random, from the genome guides
     int seed = 13; // for repeatability
-    int TESTSIZE = 10000; //packedGenomeGuides.size(); //10000; // number of random guides to test
+    int TESTSIZE = 1000; //packedGenomeGuides.size(); //10000; // number of random guides to test
     std::vector<std::string> testGuides = selectRandomVectors(packedGenomeGuides, seed, TESTSIZE);
     
     std::cout << "Loaded " << testGuides.size() << " test guides, " <<  packedGenomeGuides.size() << " genome guides" << std::endl;
@@ -575,6 +610,7 @@ int main() {
         // Define the number of threads to use for parallel execution
         int numThreads = std::thread::hardware_concurrency();
 //        numThreads=128;
+//        numThreads=1;
 
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
@@ -597,13 +633,22 @@ int main() {
 //					 auto generateVariations_duration = std::chrono::duration_cast<std::chrono::microseconds>(generateVariations_end - generateVariations_start).count();
 //					 std::cout << "generateVariations: " << generateVariations_duration/1000000.001 << " seconds" << std::endl;
 
+//for (const auto v : variations)
+//	std::cout << v << '\n';
+//exit(0);
+
 #ifdef NEVER
                 variations.erase(variations.begin());
                 std::sort(variations.begin(), variations.end());
 #else
+//				auto sort_start = std::chrono::steady_clock::now();
                 std::sort(variations.begin() + 1, variations.end());
+//				auto sort_end = std::chrono::steady_clock::now();
+//				auto sort_duration = std::chrono::duration_cast<std::chrono::microseconds>(sort_end - sort_start).count();
+//				std::cout << "sort: " << sort_duration/1000000.001 << " seconds" << std::endl;
 #endif
-                
+
+
                 std::vector<uint64_t> matches;
                 std::vector<size_t> positions;
                 //            auto start4 = std::chrono::steady_clock::now(); // Start timing

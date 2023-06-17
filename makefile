@@ -1,4 +1,4 @@
-all : at_hammingDist at_getVariations getVariations
+all : at_hammingDist at_getVariations getVariations at_evalGuides
 
 at_hammingDist : at_hammingDist.cpp 
 	g++ -std=c++14 -pthread -O3 -Wall -mavx2 -mavx512f -march=native at_hammingDist.cpp -o at_hammingDist
@@ -9,5 +9,9 @@ at_getVariations : at_getVariations.cpp
 getVariations : getVariations.cpp 
 	g++ -std=c++17 -O3 -Wall -mavx2 -mavx512f -march=native getVariations.cpp -o getVariations
 
+at_evalGuides : at_evalGuides.cpp
+	g++ -std=c++17 -O3 -Wall -march=native at_evalGuides.cpp -o at_evalGuides
+
+
 clean :
-	rm at_hammingDist at_getVariations getVariations
+	rm at_hammingDist at_getVariations getVariations at_evalGuides
