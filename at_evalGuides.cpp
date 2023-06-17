@@ -13,7 +13,9 @@
 #include <sstream>
 #include <random>
 
-#ifdef __APPLE__
+#include <string.h>
+
+#if defined(__APPLE__) || defined(__linux__)
 	#include <sys/types.h>
 	#include <sys/stat.h>
 	#include <unistd.h>
@@ -371,7 +373,7 @@ std::vector<uint64_t> loadPackedGenomeGuidesFromFile(const std::string& filename
 
 #endif
 
-#ifndef NEVER
+#ifdef NEVER
 // Function to generate variations with 0 to 4 replacements away from a given 20mer
 
 void generateVariations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0) {
@@ -539,7 +541,7 @@ std::vector<std::string> selectRandomVectors(const std::vector<uint64_t>& guides
     std::mt19937 rng(seed);  // Initialize the random number generator with the given seed
     std::vector<std::string> selected;
 
-    if (count > guides.size()) {
+    if (count > (int)guides.size()) {
         std::cout << "Warning: count is larger than vector size, returning all" << std::endl;
         count = (int) guides.size();  // Return all vectors if count exceeds or equals the size of the input vector
     }
@@ -590,7 +592,7 @@ int main() {
 
     // select test guides at random, from the genome guides
     int seed = 13; // for repeatability
-    int TESTSIZE = 1000; //packedGenomeGuides.size(); //10000; // number of random guides to test
+    int TESTSIZE = 5000; //packedGenomeGuides.size(); //10000; // number of random guides to test
     std::vector<std::string> testGuides = selectRandomVectors(packedGenomeGuides, seed, TESTSIZE);
     
     std::cout << "Loaded " << testGuides.size() << " test guides, " <<  packedGenomeGuides.size() << " genome guides" << std::endl;
@@ -690,7 +692,7 @@ int main() {
         // Single theared
         int variationTime=0, IntersectTime=0;
         std::cout << "Single threaded execution\n";
-        for (int i=0; i<testGuides.size(); i++) {
+        for (size_t i=0; i<testGuides.size(); i++) {
             std::vector<uint64_t> variations;
             std::vector<uint64_t> matches;
             std::vector<size_t> positions;
