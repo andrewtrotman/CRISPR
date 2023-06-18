@@ -341,7 +341,7 @@ int main(int argc, const char *argv[])
 	/*
 		Generate some random samples.
 	*/
-	constexpr size_t TESTSIZE = 1000;
+	constexpr size_t TESTSIZE = 10000;
 	std::vector<std::string> test_guides(TESTSIZE);
 	fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
 
