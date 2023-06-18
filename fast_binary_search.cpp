@@ -36,7 +36,7 @@ namespace fast_binary_search
 	/*
 		The number of bases to use as the key to the index.
 	*/
-	constexpr size_t index_width_in_bases = 10;
+	constexpr size_t index_width_in_bases = 14;
 	constexpr size_t base_width_in_bits = 2;
 
 	/*
