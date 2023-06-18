@@ -373,7 +373,7 @@ std::vector<uint64_t> loadPackedGenomeGuidesFromFile(const std::string& filename
 
 #endif
 
-#ifdef NEVER
+#ifndef NEVER
 // Function to generate variations with 0 to 4 replacements away from a given 20mer
 
 void generateVariations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0) {
@@ -592,7 +592,7 @@ int main() {
 
     // select test guides at random, from the genome guides
     int seed = 13; // for repeatability
-    int TESTSIZE = 5000; //packedGenomeGuides.size(); //10000; // number of random guides to test
+    int TESTSIZE = 100; //packedGenomeGuides.size(); //10000; // number of random guides to test
     std::vector<std::string> testGuides = selectRandomVectors(packedGenomeGuides, seed, TESTSIZE);
     
     std::cout << "Loaded " << testGuides.size() << " test guides, " <<  packedGenomeGuides.size() << " genome guides" << std::endl;
@@ -612,7 +612,7 @@ int main() {
         // Define the number of threads to use for parallel execution
         int numThreads = std::thread::hardware_concurrency();
 //        numThreads=128;
-//        numThreads=1;
+        numThreads=1;
 
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
@@ -623,6 +623,8 @@ int main() {
         
         // Function to be executed in parallel by each thread
         auto processChunk = [&](size_t start, size_t end) {
+
+//printf("start:%zu end:%zu\n", start, end);
             for (size_t i = start; i < end; ++i) {
 
 //                std::vector<uint64_t> variations(424996);
@@ -644,7 +646,9 @@ int main() {
                 std::sort(variations.begin(), variations.end());
 #else
 //				auto sort_start = std::chrono::steady_clock::now();
-                std::sort(variations.begin() + 1, variations.end());
+				variations[0] = 0;
+                std::sort(variations.begin(), variations.end());
+//	                std::sort(variations.begin() + 1, variations.end());
 //				auto sort_end = std::chrono::steady_clock::now();
 //				auto sort_duration = std::chrono::duration_cast<std::chrono::microseconds>(sort_end - sort_start).count();
 //				std::cout << "sort: " << sort_duration/1000000.001 << " seconds" << std::endl;
@@ -657,7 +661,11 @@ int main() {
 #ifdef NEVER
                 compute_intersection_list(variations.data(), variations.size(), packedGenomeGuides.data(), packedGenomeGuides.size(), matches, positions);
 #else
-                compute_intersection_list(variations.data() + 1, variations.size() - 1, packedGenomeGuides.data(), packedGenomeGuides.size(), matches, positions);
+                compute_intersection_list(variations.data(), variations.size(), packedGenomeGuides.data(), packedGenomeGuides.size(), matches, positions);
+
+//printf("i:%zu (v:%zu) %zu %zu\n", i, variations.size(), positions.size(), matches.size());
+
+//                compute_intersection_list(variations.data() + 1, variations.size() - 1, packedGenomeGuides.data(), packedGenomeGuides.size(), matches, positions);
 #endif
                 //            auto end4 = std::chrono::steady_clock::now(); // End timing
                 //            auto duration4 = std::chrono::duration_cast<std::chrono::microseconds>(end4 - start4).count();
