@@ -300,7 +300,7 @@ void process_chunk(size_t start, size_t end, std::vector<std::string> &test_guid
 		std::vector<uint64_t> variations;
 		fast_binary_search::generate_variations(test_guides[i], variations);
 
-		std::sort(variations.begin() + 1, variations.end());		// +1 because the first element is the test guide
+//		std::sort(variations.begin() + 1, variations.end());		// +1 because the first element is the test guide
 
 		std::vector<uint64_t> matches;
 		std::vector<size_t> positions;
