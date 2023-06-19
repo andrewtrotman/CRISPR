@@ -62,44 +62,15 @@ namespace fast_binary_search
 		/*
 			Get the end of each group by passing over the data once.  But first make sure the index starts at the beginning and finishes at the end.
 		*/
-		const uint64_t *end = data + length;
-		for (const uint64_t *current = data; current < end - 1; current++)
-			{
-			auto index_position = (*current >> ((20 - index_width_in_bases) * base_width_in_bits)) + 1;
-//std::cout << "I:" << index_position << " : " << unpack20mer(*(current + 1)) << "\n";
-			index[index_position] = current + 1;
-			}
 		index[0] = data;
 		index[index.size() - 1] = data + length - 1;
-
-
-//std::cout << "[" << index[22105960] << "]\n";
-//std::cout << "original data:\n";
-//for (const uint64_t *current = data; current < end; current++)
-//	std::cout << unpack20mer(*current) << "\n";
-//
-//std::cerr << "\ninitial index: dump\n";
-//for (uint64_t thing = 0; thing < index.size(); thing++)
-//	if (index[thing] != nullptr)
-//		std::cout << unpack20mer(*index[thing]) << "\n";
-//	else
-//		std::cout << " - " << "\n";
-//
-//std::cout << "Fix NULLs\n";
+		const uint64_t *end = data + length;
+		for (const uint64_t *current = data; current < end - 1; current++)
+			index[(*current >> ((20 - index_width_in_bases) * base_width_in_bits)) + 1] = current + 1;
 
 		/*
-			Remove nullptrs by setting the start of nullptrs to the start of the next in the index (so that index[start]..index[start + 1] is always correct).
+			Remove nullptrs by setting the start of the current range to the start of the previous range. Now,
 		*/
-#ifdef NEVER
-		const uint64_t **index_end = &index[index.size() - 1];
-		const uint64_t **previous = index_end;
-		for (const uint64_t **current = index_end; current >= &index[0]; current--)
-			{
-			if (*current == nullptr)
-				*current = *previous;
-			previous = current;
-			}
-#else
 		const uint64_t **index_end = &index[index.size() - 1];
 		const uint64_t **previous = &index[0];
 		for (const uint64_t **current = &index[0]; current < index_end; current++)
@@ -108,16 +79,6 @@ namespace fast_binary_search
 				*current = *previous;
 			previous = current;
 			}
-#endif
-
-//std::cout << "[" << index[22105960] << "]" << unpack20mer(*index[22105960]) << "\n";
-
-//std::cerr << "redump\n";
-//
-//std::cerr << "\nfixed index: dump\n";
-//for (uint64_t thing = 0; thing < index.size(); thing++)
-//	std::cout << unpack20mer(*index[thing]) << "\n";
-//exit(0);
 		}
 
 	/*
@@ -126,31 +87,15 @@ namespace fast_binary_search
 	*/
 	void compute_intersection_list(const uint64_t *key, size_t key_length, const uint64_t *data, size_t data_length, std::vector<uint64_t> &matches, std::vector<size_t> &positions)
 		{
-static uint64_t run = 0;
-
 		const uint64_t *key_end = key + key_length;
 		for (const uint64_t *current_key = key; current_key < key_end; current_key++)
 			{
-run++;
 			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
-
-//if (run == 17429)
-//	{
-//	std::cout << "Key:" << index_key << "\n";
-//	std::cout << "12345678901234567890\n";
-//	std::cout << unpack20mer(*index[index_key]) << "\n";
-//	std::cout << unpack20mer(*current_key) << "\n";
-//	std::cout << unpack20mer(*index[index_key + 1]) << "\n";
-//	exit(0);
-//	}
-
 			if (index[index_key] != index[index_key + 1])
 				{
-//std::cout << unpack20mer(*index[index_key].start) << " <- " << unpack20mer(*current_key) << "\n";
 				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
 				if (*found == *current_key)
 					{
-//std::cout << run << ": HIT\n";
 					matches.push_back(*found);
 					positions.push_back(found - data);
 					}
@@ -336,6 +281,11 @@ std::vector<std::vector<uint64_t>> all_matches;
 std::vector<std::vector<size_t>> all_positions;
 
 /*
+	Command line parameters
+*/
+size_t TESTSIZE = 1000;
+
+/*
 	PROCESS_CHUNK()
 	---------------
 */
@@ -358,18 +308,25 @@ void process_chunk(size_t start, size_t end, std::vector<std::string> &test_guid
 
 		all_matches.push_back(matches);
 		all_positions.push_back(positions);
-
-//if (positions.size() == 0)
-//	puts("Empty");
 		}
 	}
+
+/*
+	USAGE()
+	-------
+*/
+void usage(const char *exename)
+	{
+	std::cout << "Usage:" << exename << "[-b<index_width_in_bases>] [-t<TESTSIZE>]\n";
+	}
+
 /*
 	MAIN()
 	------
 */
 int main(int argc, const char *argv[])
 	{
-    auto start_main = std::chrono::steady_clock::now(); // Start timing
+	auto start_main = std::chrono::steady_clock::now(); // Start timing
 
 	fast_binary_search::kmer_encoding_table[(size_t)'A'] = 0;
 	fast_binary_search::kmer_encoding_table[(size_t)'C'] = 1;
@@ -383,7 +340,6 @@ int main(int argc, const char *argv[])
 	std::string guides_filename = "OryzaSativaGuides.txt";
 	std::vector<uint64_t> packed_genome_guides = fast_binary_search::load_guides(guides_filename);
 
-
 	/*
 		Generate some random samples.
 	*/
@@ -391,7 +347,7 @@ int main(int argc, const char *argv[])
 	std::vector<std::string> test_guides(TESTSIZE);
 	fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
 
-std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
+	std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
 
 	/*
 		Generate the index over the guides.
@@ -407,7 +363,7 @@ std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_geno
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-	thread_count = 1;
+//	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
@@ -423,11 +379,9 @@ std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_geno
 	for (int i = 0; i < thread_count - 1; i++)
 		{
 		threads.push_back(std::thread(process_chunk, start_index, start_index + chunk_size, std::ref(test_guides), std::ref(packed_genome_guides)));
-//		process_chunk(start_index, start_index + chunk_size, test_guides, packed_genome_guides);
 		start_index += chunk_size;
 		}
 	threads.push_back(std::thread(process_chunk, start_index, test_guides.size(), std::ref(test_guides), std::ref(packed_genome_guides)));
-//	process_chunk(start_index, test_guides.size(), test_guides, packed_genome_guides);
 
 	/*
 		Wait for each thread to terminate
