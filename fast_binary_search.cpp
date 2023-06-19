@@ -26,19 +26,10 @@
 namespace fast_binary_search
 	{
 	/*
-		STRUCT START_END
-		----------------
-	*/
-	typedef struct
-		{
-		const uint64_t *start;
-		const uint64_t *end;
-		} start_end;
-
-	/*
 		The number of bases to use as the key to the index.
 	*/
 	constexpr size_t index_width_in_bases = 14;
+//	constexpr size_t index_width_in_bases = 1;
 	constexpr size_t base_width_in_bits = 2;
 
 	/*
@@ -49,7 +40,7 @@ namespace fast_binary_search
 	/*
 		The index
 	*/
-	std::vector<start_end>index;
+	std::vector<const uint64_t *>index;
 
 	/*
 		Prototypes
@@ -66,28 +57,67 @@ namespace fast_binary_search
 		/*
 			Allocate space for the index
 		*/
-		index.resize((size_t)pow(4, index_width_in_bases));
+		index.resize((size_t)pow(4, index_width_in_bases) + 1);		// +1 because we need a terminator on the end
 
 		/*
-			Get the end of each group by passing over the data once
+			Get the end of each group by passing over the data once.  But first make sure the index starts at the beginning and finishes at the end.
 		*/
 		const uint64_t *end = data + length;
-		for (const uint64_t *current = data; current < end; current++)
-			index[*current >> ((20 - index_width_in_bases) * base_width_in_bits)].end = current;
+		for (const uint64_t *current = data; current < end - 1; current++)
+			{
+			auto index_position = (*current >> ((20 - index_width_in_bases) * base_width_in_bits)) + 1;
+//std::cout << "I:" << index_position << " : " << unpack20mer(*(current + 1)) << "\n";
+			index[index_position] = current + 1;
+			}
+		index[0] = data;
+		index[index.size() - 1] = data + length - 1;
+
+
+//std::cout << "[" << index[22105960] << "]\n";
+//std::cout << "original data:\n";
+//for (const uint64_t *current = data; current < end; current++)
+//	std::cout << unpack20mer(*current) << "\n";
+//
+//std::cerr << "\ninitial index: dump\n";
+//for (uint64_t thing = 0; thing < index.size(); thing++)
+//	if (index[thing] != nullptr)
+//		std::cout << unpack20mer(*index[thing]) << "\n";
+//	else
+//		std::cout << " - " << "\n";
+//
+//std::cout << "Fix NULLs\n";
 
 		/*
-			Get the start of each group by passing over the index and setting the start to one after the previosu end
+			Remove nullptrs by setting the start of nullptrs to the start of the next in the index (so that index[start]..index[start + 1] is always correct).
 		*/
-		const uint64_t *previous = data;
-		start_end *index_end = &index[index.size()];
-		for (start_end *current = &index[0]; current < index_end; current++)
+#ifdef NEVER
+		const uint64_t **index_end = &index[index.size() - 1];
+		const uint64_t **previous = index_end;
+		for (const uint64_t **current = index_end; current >= &index[0]; current--)
 			{
-			if (current->end != nullptr)
-				{
-				current->start = previous;
-				previous = current->end + 1;
-				}
+			if (*current == nullptr)
+				*current = *previous;
+			previous = current;
 			}
+#else
+		const uint64_t **index_end = &index[index.size() - 1];
+		const uint64_t **previous = &index[0];
+		for (const uint64_t **current = &index[0]; current < index_end; current++)
+			{
+			if (*current == nullptr)
+				*current = *previous;
+			previous = current;
+			}
+#endif
+
+//std::cout << "[" << index[22105960] << "]" << unpack20mer(*index[22105960]) << "\n";
+
+//std::cerr << "redump\n";
+//
+//std::cerr << "\nfixed index: dump\n";
+//for (uint64_t thing = 0; thing < index.size(); thing++)
+//	std::cout << unpack20mer(*index[thing]) << "\n";
+//exit(0);
 		}
 
 	/*
@@ -96,21 +126,31 @@ namespace fast_binary_search
 	*/
 	void compute_intersection_list(const uint64_t *key, size_t key_length, const uint64_t *data, size_t data_length, std::vector<uint64_t> &matches, std::vector<size_t> &positions)
 		{
+static uint64_t run = 0;
+
 		const uint64_t *key_end = key + key_length;
 		for (const uint64_t *current_key = key; current_key < key_end; current_key++)
 			{
+run++;
 			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
-			if (index[index_key].start != nullptr)
+
+//if (run == 17429)
+//	{
+//	std::cout << "Key:" << index_key << "\n";
+//	std::cout << "12345678901234567890\n";
+//	std::cout << unpack20mer(*index[index_key]) << "\n";
+//	std::cout << unpack20mer(*current_key) << "\n";
+//	std::cout << unpack20mer(*index[index_key + 1]) << "\n";
+//	exit(0);
+//	}
+
+			if (index[index_key] != index[index_key + 1])
 				{
-
-//std::cout << index[index_key].start << " - " << (index[index_key].end + 1);
-//std::cout << " -> ";
-//std::cout << index[index_key].start << " - " << index[index_key + 1].start;
-//std::cout << "\n";
-
-				const uint64_t *found = std::lower_bound(index[index_key].start, index[index_key].end + 1, *current_key);
+//std::cout << unpack20mer(*index[index_key].start) << " <- " << unpack20mer(*current_key) << "\n";
+				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
 				if (*found == *current_key)
 					{
+//std::cout << run << ": HIT\n";
 					matches.push_back(*found);
 					positions.push_back(found - data);
 					}
@@ -211,7 +251,7 @@ namespace fast_binary_search
 			}
 		while (guide != NULL && *(guide + 1) != '\0');
 
-		std::sort(packed_guides.begin(),packed_guides.end());
+		std::sort(packed_guides.begin(), packed_guides.end());
 		free(data);
 
 		return packed_guides;
@@ -347,7 +387,7 @@ int main(int argc, const char *argv[])
 	/*
 		Generate some random samples.
 	*/
-	constexpr size_t TESTSIZE = 10000;
+	constexpr size_t TESTSIZE = 1000;
 	std::vector<std::string> test_guides(TESTSIZE);
 	fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
 
