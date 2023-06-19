@@ -363,7 +363,7 @@ int main(int argc, const char *argv[])
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-//	thread_count = 1;
+	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
