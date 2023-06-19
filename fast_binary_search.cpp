@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 #if defined(__APPLE__) || defined(__linux__)
 	#include <sys/types.h>
@@ -13,6 +14,7 @@
 	#include <unistd.h>
 #endif
 
+#include <mutex>
 #include <thread>
 #include <chrono>
 #include <vector>
@@ -48,7 +50,6 @@ namespace fast_binary_search
 		The index
 	*/
 	std::vector<start_end>index;
-
 
 	/*
 		Prototypes
@@ -101,6 +102,12 @@ namespace fast_binary_search
 			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
 			if (index[index_key].start != nullptr)
 				{
+
+//std::cout << index[index_key].start << " - " << (index[index_key].end + 1);
+//std::cout << " -> ";
+//std::cout << index[index_key].start << " - " << index[index_key + 1].start;
+//std::cout << "\n";
+
 				const uint64_t *found = std::lower_bound(index[index_key].start, index[index_key].end + 1, *current_key);
 				if (*found == *current_key)
 					{
@@ -109,7 +116,6 @@ namespace fast_binary_search
 					}
 				}
 			}
-//fstd::cout << matches.size() << " ";
 		}
 
 	/*
@@ -361,7 +367,7 @@ std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_geno
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-//	thread_count = 1;
+	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
