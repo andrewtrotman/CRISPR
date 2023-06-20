@@ -10,6 +10,7 @@
 #include <chrono>
 #include <random>
 #include <iostream>
+#include <algorithm>
 
 /*
 	AVX_BINARY_SEARCH()
@@ -47,7 +48,7 @@ int main(int argc, char *argv[])
 
 	for (size_t d = 0; d < 100; d++)
 		data.push_back(distribution(random));
-	sort(data.begin(), data.end());
+	std::sort(data.begin(), data.end());
 
 	for (size_t d = 0; d < 16'000'000; d++)
 		search_for.push_back(distribution(random));
@@ -74,7 +75,7 @@ int main(int argc, char *argv[])
 	__m512i upper = _mm512_set1_epi64(data.size() - 1);
 	for (uint64_t x = 0; x < search_for.size(); x += 8)
 		{
-		auto key = _mm512_load_epi64 (&search_for[x]);
+		auto key = _mm512_loadu_epi64 (&search_for[x]);
 		auto found_at = avx_binary_search(&data[0], lower, upper, key);
 
 		int64_t mem[8];

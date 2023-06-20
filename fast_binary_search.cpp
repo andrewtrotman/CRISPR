@@ -376,7 +376,7 @@ int main(int argc, const char *argv[])
 		Launch each thread
 	*/
 	std::cout << "Launching " << thread_count << " threads\n";
-	for (int i = 0; i < thread_count - 1; i++)
+	for (size_t i = 0; i < thread_count - 1; i++)
 		{
 		threads.push_back(std::thread(process_chunk, start_index, start_index + chunk_size, std::ref(test_guides), std::ref(packed_genome_guides)));
 		start_index += chunk_size;

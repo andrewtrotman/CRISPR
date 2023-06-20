@@ -20,4 +20,4 @@ at_evalGuides : at_evalGuides.cpp
 
 
 clean :
-	rm at_hammingDist at_getVariations getVariations at_evalGuides fast_binary_search
+	rm at_hammingDist at_getVariations getVariations at_evalGuides fast_binary_search avx512_binary_search
