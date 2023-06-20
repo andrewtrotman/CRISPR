@@ -435,6 +435,7 @@ int main(int argc, const char *argv[])
     }
     total_count = all_matches.size() - empty_count;
     double mean_matches = sum_matches / all_matches.size();
+
     /*
         Dump the statistics
     */

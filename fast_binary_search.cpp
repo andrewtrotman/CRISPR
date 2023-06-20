@@ -82,28 +82,6 @@ namespace fast_binary_search
 		}
 
 	/*
-		COMPUTE_INTERSECTION_LIST
-		-------------------------
-	*/
-	void compute_intersection_list(const uint64_t *key, size_t key_length, const uint64_t *data, size_t data_length, std::vector<uint64_t> &matches, std::vector<size_t> &positions)
-		{
-		const uint64_t *key_end = key + key_length;
-		for (const uint64_t *current_key = key; current_key < key_end; current_key++)
-			{
-			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
-			if (index[index_key] != index[index_key + 1])
-				{
-				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
-				if (*found == *current_key)
-					{
-					matches.push_back(*found);
-					positions.push_back(found - data);
-					}
-				}
-			}
-		}
-
-	/*
 		PACK20MER()
 		-----------
 	*/
@@ -143,6 +121,32 @@ namespace fast_binary_search
 				}
 			}
 		return sequence;
+		}
+
+	/*
+		COMPUTE_INTERSECTION_LIST
+		-------------------------
+	*/
+	void compute_intersection_list(const uint64_t *key, size_t key_length, const uint64_t *data, size_t data_length, std::vector<uint64_t> &matches, std::vector<size_t> &positions)
+		{
+		matches.push_back(*key);			// the first key is guaranteed to be the key from which the variants were generated
+		positions.push_back(1000000000);
+
+		const uint64_t *key_end = key + key_length;
+		for (const uint64_t *current_key = key + 1; current_key < key_end; current_key++)
+			{
+			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
+			if (index[index_key] != index[index_key + 1])
+				{
+				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
+				if (*found == *current_key)
+					{
+					matches.push_back(*found);
+					positions.push_back(found - data);
+					}
+				}
+			}
+//fstd::cout << matches.size() << " ";
 		}
 
 	/*
@@ -202,11 +206,30 @@ namespace fast_binary_search
 		return packed_guides;
 		}
 
-		/*
-			SELECT_RANDOM_VECTORS()
-			-----------------------
-		*/
-		void select_random_vectors(std::vector<std::string> &selected, const std::vector<uint64_t>& guides)
+	/*
+		SELECT_PSEUDO_RANDOM_VECTORS()
+		------------------------------
+	*/
+	void select_pseudo_random_vectors(std::vector<std::string> &selected, const std::vector<uint64_t> &guides)
+		{
+		uint64_t seed = 17;
+		uint64_t m = guides.size() - 1;		// Modulus parameter
+		uint64_t a = 3;						// Multiplier term
+		uint64_t c = 3;						// Increment term
+		uint64_t next = seed;
+
+		for (uint64_t which = 0; which < selected.size(); which++)
+			{
+			selected[which] = unpack20mer(guides[next]);
+			next = ((next * a) + c) % m;
+			}
+		}
+
+	/*
+		SELECT_RANDOM_VECTORS()
+		-----------------------
+	*/
+	void select_random_vectors(std::vector<std::string> &selected, const std::vector<uint64_t>& guides)
 		{
 //		constexpr int seed = 13;
 		constexpr int seed = 17;
@@ -300,7 +323,7 @@ void process_chunk(size_t start, size_t end, std::vector<std::string> &test_guid
 
 		std::vector<uint64_t> matches;
 		std::vector<size_t> positions;
-		fast_binary_search::compute_intersection_list(variations.data() + 1, variations.size() - 1, packed_genome_guides.data(), packed_genome_guides.size(), matches, positions);
+		fast_binary_search::compute_intersection_list(variations.data(), variations.size(), packed_genome_guides.data(), packed_genome_guides.size(), matches, positions);
 
 		// Lock the mutexes before modifying the shared vectors
 		std::lock_guard<std::mutex> matches_lock(matches_mutex);
@@ -341,11 +364,25 @@ int main(int argc, const char *argv[])
 	std::vector<uint64_t> packed_genome_guides = fast_binary_search::load_guides(guides_filename);
 
 	/*
-		Generate some random samples.
+		Generate some samples (sometimes random, and sometimes not, so keep both versions)
 	*/
-	constexpr size_t TESTSIZE = 1000;
-	std::vector<std::string> test_guides(TESTSIZE);
-	fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
+	size_t TESTSIZE;
+	std::vector<std::string> test_guides;
+	if (true)
+		{
+		TESTSIZE = 1000;
+		test_guides.resize(TESTSIZE);
+		fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
+		fast_binary_search::select_pseudo_random_vectors(test_guides, packed_genome_guides);
+		}
+	else
+		{
+		TESTSIZE = packed_genome_guides.size();
+		test_guides.resize(TESTSIZE);
+		std::vector<std::string> test_guides(TESTSIZE);
+		for (size_t which = 0; which < TESTSIZE; which++)
+		test_guides[which] = fast_binary_search::unpack20mer(packed_genome_guides[which]);
+		}
 
 	std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
 
@@ -398,46 +435,35 @@ int main(int argc, const char *argv[])
 	/*
 		Calculate the statistics
 	*/
-	size_t total_count = all_matches.size();
-	size_t empty_count = std::count_if(all_positions.begin(), all_positions.end(), [](const std::vector<size_t> &positions)
-		{
-		return positions.empty();
-		});
-
 	double sum_matches = 0.0;
-	size_t min_matches = std::numeric_limits<size_t>::max();
-	size_t max_matches = 0;
-
-	for (const auto& matches : all_matches)
+	size_t min_matches = all_matches[0].size() + 1;
+	size_t max_matches = all_matches[0].size() - 1;
+//	size_t total_count = 0;
+	size_t empty_count = 0;
+	for (int i = 0; i < all_matches.size(); i++)
 		{
-		size_t count = matches.size();
-		sum_matches += count;
-		min_matches = std::min(min_matches, count);
-		max_matches = std::max(max_matches, count);
+		size_t num_matches = all_matches[i].size() - 1;
+		sum_matches += num_matches;
+		if (num_matches > 0)
+			empty_count++;
+		if (num_matches > max_matches)
+			max_matches = num_matches;
+		if (num_matches < min_matches)
+			min_matches = num_matches;
+		if ((min_matches == max_matches) && i > 0)
+			std::cout << "OOPS! min = " << min_matches << "max = " << max_matches << ", i = " << i << std::endl;
 		}
-	double mean_matches = sum_matches / total_count;
-
-	/*
-		Calculate the standard deviation
-	*/
-	double variance = 0.0;
-	for (const auto& matches : all_matches)
-		{
-		double diff = matches.size() - mean_matches;
-		variance += diff * diff;
-		}
-	variance /= total_count;
-	double std_dev_matches = std::sqrt(variance);
+//	total_count = all_matches.size() - empty_count;
+	double mean_matches = sum_matches / all_matches.size();
 
 	/*
 		Dump the statistics
 	*/
 	std::cout << "Mean number of matches: " << mean_matches << '\n';
-	std::cout << "Standard deviation of matches: " << std_dev_matches << '\n';
 	std::cout << "Minimum matches: " << min_matches << '\n';
 	std::cout << "Maximum matches: " << max_matches << '\n';
-	std::cout << "Number of unique test guides: " << empty_count << '\n';
-	std::cout << "Number of test guides with off-targets: " << TESTSIZE - empty_count << '\n';
+	std::cout << "Number of unique test guides: " << TESTSIZE - empty_count << '\n';
+	std::cout << "Number of test guides with off-targets: " << empty_count << '\n';
 	std::cout << "Mean Execution time (getvar+intersect): " << duration2 / 1000000.001 << " seconds" << '\n';
 	auto end_main = std::chrono::steady_clock::now(); // End timing
 	auto duration_main = std::chrono::duration_cast<std::chrono::microseconds>(end_main - start_main).count();
@@ -445,4 +471,3 @@ int main(int argc, const char *argv[])
 
 	return 0;
 	}
-
