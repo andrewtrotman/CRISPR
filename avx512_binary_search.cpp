@@ -1,4 +1,9 @@
-
+/*
+	AVX512_BINARY_SEARCH()
+	----------------------
+	Copyright (c) 2023 Andrew Trotman.
+	Perform 8 binary seaches in parallel, one in each of the 8 64-bit parts of an AVX512 register.
+*/
 #include <immintrin.h>
 
 #include <bitset>
@@ -10,12 +15,10 @@
 	AVX_BINARY_SEARCH()
 	-------------------
 */
-__m512i avx_binary_search(uint64_t *array, int64_t elements, __m512i key)
+__m512i avx_binary_search(uint64_t *array, __m512i lower, __m512i upper, __m512i key)
 	{
-	__mmask8 not_finished = 0;
 	__m512i one = _mm512_set1_epi64(1);
-	__m512i lower = _mm512_set1_epi64(-1);
-	__m512i upper = _mm512_set1_epi64(elements - 1);
+	__mmask8 not_finished = 0;
 
 	while ((not_finished = _mm512_cmpneq_epi64_mask(_mm512_add_epi64(lower, one), upper)) != 0x00)
 		{
@@ -24,6 +27,7 @@ __m512i avx_binary_search(uint64_t *array, int64_t elements, __m512i key)
 		lower = _mm512_mask_blend_epi64 (not_finished & results, lower, middle);
 		upper = _mm512_mask_blend_epi64 (not_finished & ~results, upper, middle);
 		}
+
 	return upper;
 	}
 
@@ -41,7 +45,7 @@ int main(int argc, char *argv[])
 	std::vector<uint64_t> data;
 	std::vector<uint64_t> search_for;
 
-	for (size_t d = 0; d < 10; d++)
+	for (size_t d = 0; d < 100; d++)
 		data.push_back(distribution(random));
 	sort(data.begin(), data.end());
 
@@ -66,10 +70,12 @@ int main(int argc, char *argv[])
 	std::cout << "512\n";
 	odds = 0;
 	stopwatch_start = std::chrono::steady_clock::now();
+	__m512i lower = _mm512_set1_epi64(-1);
+	__m512i upper = _mm512_set1_epi64(data.size() - 1);
 	for (uint64_t x = 0; x < search_for.size(); x += 8)
 		{
 		auto key = _mm512_load_epi64 (&search_for[x]);
-		auto found_at = avx_binary_search(&data[0], data.size(), key);
+		auto found_at = avx_binary_search(&data[0], lower, upper, key);
 
 		int64_t mem[8];
 		_mm512_store_epi64 (&mem, found_at);
