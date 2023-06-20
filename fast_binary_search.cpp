@@ -196,14 +196,12 @@ namespace fast_binary_search
 			{
 			if (fstat(fileno(fp), &details) == 0)
 				if (details.st_size != 0)
-					{
-					contents = (char *)malloc(details.st_size);
-					if (fread(contents, details.st_size, 1, fp) != 1)
-						{
-						free(contents);
-						contents = NULL;
-						}
-					}
+					if ((contents = (char *)malloc(details.st_size)) != NULL)
+						if (fread(contents, details.st_size, 1, fp) != 1)
+							{
+							free(contents);
+							contents = NULL;
+							}
 			fclose(fp);
 			}
 	return contents;
@@ -389,7 +387,6 @@ int main(int argc, const char *argv[])
 	/*
 		Generate some samples (sometimes random, and sometimes not, so keep both versions)
 	*/
-	size_t TESTSIZE;
 	std::vector<std::string> test_guides;
 	if (true)
 		{
@@ -402,9 +399,8 @@ int main(int argc, const char *argv[])
 		{
 		TESTSIZE = packed_genome_guides.size();
 		test_guides.resize(TESTSIZE);
-		std::vector<std::string> test_guides(TESTSIZE);
 		for (size_t which = 0; which < TESTSIZE; which++)
-		test_guides[which] = fast_binary_search::unpack20mer(packed_genome_guides[which]);
+			test_guides[which] = fast_binary_search::unpack20mer(packed_genome_guides[which]);
 		}
 
 	std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
