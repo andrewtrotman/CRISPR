@@ -14,7 +14,6 @@
 	#include <unistd.h>
 #endif
 
-#include <mutex>
 #include <thread>
 #include <chrono>
 #include <vector>
@@ -292,12 +291,6 @@ namespace fast_binary_search
 }
 
 /*
-	Mutexes
-*/
-std::mutex matches_mutex;
-std::mutex positions_mutex;
-
-/*
 	Allocate space for the final set of results
 */
 std::vector<std::vector<uint64_t>> all_matches;
@@ -325,12 +318,8 @@ void process_chunk(size_t start, size_t end, std::vector<std::string> &test_guid
 		std::vector<size_t> positions;
 		fast_binary_search::compute_intersection_list(variations.data(), variations.size(), packed_genome_guides.data(), packed_genome_guides.size(), matches, positions);
 
-		// Lock the mutexes before modifying the shared vectors
-		std::lock_guard<std::mutex> matches_lock(matches_mutex);
-		std::lock_guard<std::mutex> positions_lock(positions_mutex);
-
-		all_matches.push_back(matches);
-		all_positions.push_back(positions);
+		all_matches[i] = matches;
+		all_positions[i] = positions;
 		}
 	}
 
@@ -397,10 +386,16 @@ int main(int argc, const char *argv[])
     auto start2 = std::chrono::steady_clock::now();
 
 	/*
+		Create space to put the results
+	*/
+	all_matches.resize(test_guides.size());
+	all_positions.resize(test_guides.size());
+
+	/*
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-	thread_count = 1;
+//	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
