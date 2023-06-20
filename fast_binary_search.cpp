@@ -122,9 +122,31 @@ namespace fast_binary_search
 		return sequence;
 		}
 
+#ifdef __AVX512F__
 	/*
-		COMPUTE_INTERSECTION_LIST
-		-------------------------
+		AVX_BINARY_SEARCH()
+		-------------------
+	*/
+	__m512i avx_binary_search(uint64_t *array, __m512i lower, __m512i upper, __m512i key)
+		{
+		__m512i one = _mm512_set1_epi64(1);
+		__mmask8 not_finished = 0;
+
+		while ((not_finished = _mm512_cmpneq_epi64_mask(_mm512_add_epi64(lower, one), upper)) != 0x00)
+			{
+			__m512i middle = _mm512_srli_epi64(_mm512_add_epi64(upper, lower), 1);
+			__mmask8 results = _mm512_cmplt_epi64_mask(_mm512_i64gather_epi64(middle, array, sizeof(uint64_t)), key);
+			lower = _mm512_mask_blend_epi64 (not_finished & results, lower, middle);
+			upper = _mm512_mask_blend_epi64 (not_finished & ~results, upper, middle);
+			}
+
+		return upper;
+		}
+#endif
+
+	/*
+		COMPUTE_INTERSECTION_LIST()
+		---------------------------
 	*/
 	void compute_intersection_list(const uint64_t *key, size_t key_length, const uint64_t *data, size_t data_length, std::vector<uint64_t> &matches, std::vector<size_t> &positions)
 		{
@@ -132,7 +154,19 @@ namespace fast_binary_search
 		positions.push_back(1000000000);
 
 		const uint64_t *key_end = key + key_length;
-		for (const uint64_t *current_key = key + 1; current_key < key_end; current_key++)
+		const uint64_t *current_key = key + 1;
+		/*
+			Do the AVX512 stuff in here
+		*/
+
+#ifdef __AVX512F__
+		// TO BE WRITTEN
+#endif
+
+		/*
+			Then fall through to process the last few one at a time
+		*/
+		while (current_key < key_end)
 			{
 			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
 			if (index[index_key] != index[index_key + 1])
@@ -144,8 +178,8 @@ namespace fast_binary_search
 					positions.push_back(found - data);
 					}
 				}
+			current_key++;
 			}
-//fstd::cout << matches.size() << " ";
 		}
 
 	/*
