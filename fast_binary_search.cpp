@@ -155,12 +155,40 @@ namespace fast_binary_search
 
 		const uint64_t *key_end = key + key_length;
 		const uint64_t *current_key = key + 1;
-		/*
-			Do the AVX512 stuff in here
-		*/
 
+		/*
+			Do the AVX512 stuff first
+		*/
 #ifdef __AVX512F__
-		// TO BE WRITTEN
+		__m512i one = _mm512_set1_epi64(1);
+
+		while (current_key < key_end)
+			{
+			/*
+				Get the current key set (that we're looking for)
+			*/
+			__m512i key_set = _mm512_loadu_epi64(current_key);
+			__m512i index_key_set = _mm512_srli_epi64(key_set, ((20 - index_width_in_bases) * base_width_in_bits);
+
+			/*
+				Compute the start and end of the ranges
+			*/
+			start_set = _mm512_i64gather_epi64(index_key_set, index, sizeof(uint64_t *));
+			index_key_set = _mm512_add_epi64(index_key_set, one);
+			end_set = _mm512_i64gather_epi64(index_key_set, index, sizeof(uint64_t *));
+			// now we have the start and end positons as pointers, but we need indexes instead so they must be converted before being used.
+
+__m512i avx_binary_search(data, __m512i lower, __m512i upper, key_set);
+
+
+			const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
+			if (*found == *current_key)
+				{
+				matches.push_back(*found);
+				positions.push_back(found - data);
+				}
+			current_key += 8;
+			}
 #endif
 
 		/*
