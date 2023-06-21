@@ -151,7 +151,7 @@ namespace fast_binary_search
 	*/
 	void compute_intersection_list(const uint64_t *key, size_t key_length, const uint64_t *data, size_t data_length, std::vector<uint64_t> &matches, std::vector<size_t> &positions)
 		{
-std::cout << "COMPUTE_INTERSECTION_LIST()" <<"\n";
+//std::cout << "COMPUTE_INTERSECTION_LIST()" <<"\n";
 		matches.push_back(*key);			// the first key is guaranteed to be the key from which the variants were generated
 		positions.push_back(1000000000);
 
@@ -182,7 +182,7 @@ std::cout << "COMPUTE_INTERSECTION_LIST()" <<"\n";
 				}
 			current_key++;
 			}
-std::cout << "DONE COMPUTE_INTERSECTION_LIST()" <<"\n";
+//std::cout << "DONE COMPUTE_INTERSECTION_LIST()" <<"\n";
 		}
 
 	/*
@@ -323,7 +323,7 @@ std::cout << "DONE COMPUTE_INTERSECTION_LIST()" <<"\n";
 	*/
 	void generate_variations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
 		{
-std::cout << "in GENERATE_VARIATIONS()\n";
+//std::cout << "in GENERATE_VARIATIONS()\n";
 		generate_variations_binary(pack20mer(sequence.c_str()), variations, replacements, position);
 		}
 }
@@ -345,12 +345,12 @@ size_t TESTSIZE = 1000;
 */
 void process_chunk(size_t start, size_t end, std::vector<std::string> &test_guides, std::vector<uint64_t> &packed_genome_guides)
 	{
-std::cout << "in PROCESS_CHUNK()\n";
+//std::cout << "in PROCESS_CHUNK()\n";
 	for (size_t i = start; i < end; ++i)
 		{
 		std::vector<uint64_t> variations;
 		fast_binary_search::generate_variations(test_guides[i], variations);
-std::cout << "in PROCESS_CHUNK() after generating variations, i=" << i <<"\n";
+//std::cout << "in PROCESS_CHUNK() after generating variations, i=" << i <<"\n";
  
 //		std::sort(variations.begin() + 1, variations.end());		// +1 because the first element is the test guide
 
@@ -467,7 +467,7 @@ int main(int argc, const char *argv[])
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-	thread_count = 1;
+//	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
