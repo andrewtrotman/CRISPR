@@ -25,6 +25,7 @@
 #include <algorithm>
 
 #define __AVX512F__ 0
+#undef __AVX512__
 
 namespace fast_binary_search
 	{
