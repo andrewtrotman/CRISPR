@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <immintrin.h>
 
 #if defined(__APPLE__) || defined(__linux__)
 	#include <sys/types.h>
@@ -19,8 +20,11 @@
 #include <vector>
 #include <string>
 #include <random>
+#include <bitset>
 #include <iostream>
 #include <algorithm>
+
+#define __AVX512F__ 1
 
 namespace fast_binary_search
 	{
@@ -127,7 +131,7 @@ namespace fast_binary_search
 		AVX_BINARY_SEARCH()
 		-------------------
 	*/
-	__m512i avx_binary_search(uint64_t *array, __m512i lower, __m512i upper, __m512i key)
+	__m512i avx_binary_search(const uint64_t *array, __m512i lower, __m512i upper, __m512i key)
 		{
 		__m512i one = _mm512_set1_epi64(1);
 		__mmask8 not_finished = 0;
@@ -143,6 +147,20 @@ namespace fast_binary_search
 		return upper;
 		}
 #endif
+
+#ifdef __AVX512F__
+	/*
+		COMPUTE_INTERSECTION_LIST_AVX_HELPER()
+		--------------------------------------
+	*/
+	inline void compute_intersection_list_avx_helper(std::vector<uint64_t> &matches, std::vector<size_t> &positions, const uint64_t *data, uint64_t position, uint64_t match)
+		{
+		positions.push_back((uint64_t *)(position * 8) - data);
+		matches.push_back(match);
+//		std::cout << "[" << (uint64_t *)(position * 8) - data  << "," << match << "]";
+		}
+#endif
+
 
 	/*
 		COMPUTE_INTERSECTION_LIST()
@@ -161,31 +179,70 @@ namespace fast_binary_search
 		*/
 #ifdef __AVX512F__
 		__m512i one = _mm512_set1_epi64(1);
+		__m512i eight = _mm512_set1_epi64(8);
+		__m512i address_of_data = _mm512_set1_epi64((uint64_t)data);
 
-		while (current_key < key_end)
+		while (current_key + 8 < key_end)
 			{
 			/*
 				Get the current key set (that we're looking for)
 			*/
 			__m512i key_set = _mm512_loadu_epi64(current_key);
-			__m512i index_key_set = _mm512_srli_epi64(key_set, ((20 - index_width_in_bases) * base_width_in_bits);
+			__m512i index_key_set = _mm512_srli_epi64(key_set, (20 - index_width_in_bases) * base_width_in_bits);
 
 			/*
 				Compute the start and end of the ranges
 			*/
-			start_set = _mm512_i64gather_epi64(index_key_set, index, sizeof(uint64_t *));
+			__m512i start_set = _mm512_i64gather_epi64(index_key_set, &index[0], sizeof(uint64_t *));
 			index_key_set = _mm512_add_epi64(index_key_set, one);
-			end_set = _mm512_i64gather_epi64(index_key_set, index, sizeof(uint64_t *));
-			// now we have the start and end positons as pointers, but we need indexes instead so they must be converted before being used.
+			__m512i end_set = _mm512_i64gather_epi64(index_key_set, &index[0], sizeof(uint64_t *));
 
-__m512i avx_binary_search(data, __m512i lower, __m512i upper, key_set);
+			/*
+				We now have the start and end positions as pointers.
+				FIX: At present we convert them into indexes by dividing by 8, but could avoid that by changing the binary search to use pointers rather than indexes - which is to change the 8 in the gather to a 1.
+			*/
+			start_set = _mm512_srli_epi64(start_set, 3);
+			start_set = _mm512_sub_epi64(start_set, one);					// FIX THIS - its only necessary because the binary search counts from 1.
+			end_set = _mm512_srli_epi64(end_set, 3);
 
+			/*
+				Do the AVX512-parallel binary search
+			*/
+		__m512i found_pointers = avx_binary_search(nullptr, start_set, end_set, key_set);
+		/*
+			At this point found_set is a set of pointers to the data - which may or may not match the key (same as the result of std::lower_bound())
+		*/
+		__m512i found_values = _mm512_i64gather_epi64(found_pointers, nullptr, 8);		// 1 because found_set is a set of pointers to 64-bit integers
+		__mmask8 found_masks = _mm512_cmpeq_epi64_mask(key_set, found_values);
 
-			const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
-			if (*found == *current_key)
+			if (found_masks != 0)
 				{
-				matches.push_back(*found);
-				positions.push_back(found - data);
+				uint64_t position[8];
+				_mm512_storeu_epi64(&position[0], found_pointers);
+
+				uint64_t match[8];
+				_mm512_storeu_epi64(&match[0], found_values);
+
+				/*
+					I really want ot use the found_mask to write the results to the positon and match vectors, but at present can't
+					because that vector does not have its size pre-computed (i.e. the contents has not been allocated yet).
+				*/
+				if (found_masks & 0x01)
+					compute_intersection_list_avx_helper(matches, positions, data, position[0], match[0]);
+				if (found_masks & 0x02)
+					compute_intersection_list_avx_helper(matches, positions, data, position[1], match[1]);
+				if (found_masks & 0x04)
+					compute_intersection_list_avx_helper(matches, positions, data, position[2], match[2]);
+				if (found_masks & 0x08)
+					compute_intersection_list_avx_helper(matches, positions, data, position[3], match[3]);
+				if (found_masks & 0x10)
+					compute_intersection_list_avx_helper(matches, positions, data, position[4], match[4]);
+				if (found_masks & 0x20)
+					compute_intersection_list_avx_helper(matches, positions, data, position[5], match[5]);
+				if (found_masks & 0x40)
+					compute_intersection_list_avx_helper(matches, positions, data, position[6], match[6]);
+				if (found_masks & 0x80)
+					compute_intersection_list_avx_helper(matches, positions, data, position[7], match[7]);
 				}
 			current_key += 8;
 			}
@@ -204,6 +261,7 @@ __m512i avx_binary_search(data, __m512i lower, __m512i upper, key_set);
 					{
 					matches.push_back(*found);
 					positions.push_back(found - data);
+//std::cout << "[" << found - data << "," << *found << "]";
 					}
 				}
 			current_key++;
@@ -456,7 +514,7 @@ int main(int argc, const char *argv[])
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-//	thread_count = 1;
+	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
