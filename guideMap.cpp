@@ -445,9 +445,8 @@ int main(int argc, const char *argv[])
 		{
 		TESTSIZE = packed_genome_guides.size();
 		test_guides.resize(TESTSIZE);
-		std::vector<std::string> test_guides(TESTSIZE);
 		for (size_t which = 0; which < TESTSIZE; which++)
-		test_guides[which] = fast_binary_search::unpack20mer(packed_genome_guides[which]);
+			test_guides[which] = fast_binary_search::unpack20mer(packed_genome_guides[which]);
 		}
 
 	std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
