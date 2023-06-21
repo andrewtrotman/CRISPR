@@ -90,7 +90,11 @@ namespace fast_binary_search
 		uint64_t packed = 0;
 
 		for (int pos = 0; pos < 20; pos++)
+			{
+			if (sequence[pos] != 'A' && sequence[pos] != 'C' && sequence[pos] != 'T' && sequence[pos] != 'G')
+				printf("BROKEN SEQUENCE %*.*s\n", 20, 20, sequence);
 			packed = (packed << 2) | kmer_encoding_table[(size_t)sequence[pos]];
+			}
 
 		return packed;
 		}
