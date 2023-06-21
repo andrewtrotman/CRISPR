@@ -224,12 +224,15 @@ __m512i avx_binary_search(data, __m512i lower, __m512i upper, key_set);
 			{
 			if (fstat(fileno(fp), &details) == 0)
 				if (details.st_size != 0)
-					if ((contents = (char *)malloc(details.st_size)) != NULL)
+					if ((contents = (char *)malloc(details.st_size + 1)) != NULL)
+						{
 						if (fread(contents, details.st_size, 1, fp) != 1)
 							{
 							free(contents);
 							contents = NULL;
 							}
+						contents[details.st_size] = '\0';
+						}
 			fclose(fp);
 			}
 	return contents;

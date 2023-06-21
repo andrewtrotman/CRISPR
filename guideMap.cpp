@@ -200,12 +200,13 @@ namespace fast_binary_search
 			if (fstat(fileno(fp), &details) == 0)
 				if (details.st_size != 0)
 					{
-					contents = (char *)malloc(details.st_size);
+					contents = (char *)malloc(details.st_size + 1);
 					if (fread(contents, details.st_size, 1, fp) != 1)
 						{
 						free(contents);
 						contents = NULL;
 						}
+					contents[details.st_size] = '\0';
 					}
 			fclose(fp);
 			}
