@@ -25,7 +25,7 @@
 #include <algorithm>
 
 #define __AVX512F__ 0
-#undef __AVX512__
+#undef __AVX512F__
 
 namespace fast_binary_search
 	{
@@ -154,10 +154,9 @@ namespace fast_binary_search
 		COMPUTE_INTERSECTION_LIST_AVX_HELPER()
 		--------------------------------------
 	*/
-	inline void compute_intersection_list_avx_helper(std::vector<uint64_t> &matches, std::vector<size_t> &positions, const uint64_t *data, uint64_t position, uint64_t match)
+	inline void compute_intersection_list_avx_helper(std::vector<const uint64_t *> &positions, uint64_t position)
 		{
-		positions.push_back((uint64_t *)(position * 8) - data);
-		matches.push_back(match);
+		positions.push_back((uint64_t *)(position * 8));
 //		std::cout << "[" << (uint64_t *)(position * 8) - data  << "," << match << "]";
 		}
 #endif
@@ -167,10 +166,9 @@ namespace fast_binary_search
 		COMPUTE_INTERSECTION_LIST()
 		---------------------------
 	*/
-	void compute_intersection_list(const uint64_t *key, size_t key_length, const uint64_t *data, size_t data_length, std::vector<uint64_t> &matches, std::vector<size_t> &positions)
+	void compute_intersection_list(const uint64_t *key, size_t key_length, const uint64_t *data, size_t data_length, std::vector<const uint64_t *> &positions)
 		{
-		matches.push_back(*key);			// the first key is guaranteed to be the key from which the variants were generated
-		positions.push_back(1000000000);
+		positions.push_back(nullptr);				// push the guide before working on the variants
 
 		const uint64_t *key_end = key + key_length;
 		const uint64_t *current_key = key + 1;
@@ -180,8 +178,6 @@ namespace fast_binary_search
 		*/
 #ifdef __AVX512F__
 		__m512i one = _mm512_set1_epi64(1);
-		__m512i eight = _mm512_set1_epi64(8);
-		__m512i address_of_data = _mm512_set1_epi64((uint64_t)data);
 
 		while (current_key + 8 < key_end)
 			{
@@ -218,39 +214,39 @@ namespace fast_binary_search
 
 			if (found_masks != 0)
 				{
+				/*
+					Change this to masked write then a switch to insert
+				*/
 				uint64_t position[8];
 				_mm512_storeu_epi64(&position[0], found_pointers);
-
-				uint64_t match[8];
-				_mm512_storeu_epi64(&match[0], found_values);
 
 				/*
 					I really want ot use the found_mask to write the results to the positon and match vectors, but at present can't
 					because that vector does not have its size pre-computed (i.e. the contents has not been allocated yet).
 				*/
 				if (found_masks & 0x01)
-					compute_intersection_list_avx_helper(matches, positions, data, position[0], match[0]);
+					compute_intersection_list_avx_helper(positions, position[0]);
 				if (found_masks & 0x02)
-					compute_intersection_list_avx_helper(matches, positions, data, position[1], match[1]);
+					compute_intersection_list_avx_helper(positions, position[1]);
 				if (found_masks & 0x04)
-					compute_intersection_list_avx_helper(matches, positions, data, position[2], match[2]);
+					compute_intersection_list_avx_helper(positions, position[2]);
 				if (found_masks & 0x08)
-					compute_intersection_list_avx_helper(matches, positions, data, position[3], match[3]);
+					compute_intersection_list_avx_helper(positions, position[3]);
 				if (found_masks & 0x10)
-					compute_intersection_list_avx_helper(matches, positions, data, position[4], match[4]);
+					compute_intersection_list_avx_helper(positions, position[4]);
 				if (found_masks & 0x20)
-					compute_intersection_list_avx_helper(matches, positions, data, position[5], match[5]);
+					compute_intersection_list_avx_helper(positions, position[5]);
 				if (found_masks & 0x40)
-					compute_intersection_list_avx_helper(matches, positions, data, position[6], match[6]);
+					compute_intersection_list_avx_helper(positions, position[6]);
 				if (found_masks & 0x80)
-					compute_intersection_list_avx_helper(matches, positions, data, position[7], match[7]);
+					compute_intersection_list_avx_helper(positions, position[7]);
 				}
 			current_key += 8;
 			}
 #endif
 
 		/*
-			Then fall through to process the last few one at a time
+			Then fall through to process the last few one at a time (if no AVX512 then do this for all guides)
 		*/
 		while (current_key < key_end)
 			{
@@ -260,8 +256,7 @@ namespace fast_binary_search
 				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
 				if (*found == *current_key)
 					{
-					matches.push_back(*found);
-					positions.push_back(found - data);
+					positions.push_back(found);
 //std::cout << "[" << found - data << "," << *found << "]";
 					}
 				}
@@ -415,8 +410,7 @@ namespace fast_binary_search
 /*
 	Allocate space for the final set of results
 */
-std::vector<std::vector<uint64_t>> all_matches;
-std::vector<std::vector<size_t>> all_positions;
+std::vector<std::vector<const uint64_t *>> all_positions;
 
 /*
 	Command line parameters
@@ -433,15 +427,7 @@ void process_chunk(size_t start, size_t end, std::vector<std::string> &test_guid
 		{
 		std::vector<uint64_t> variations;
 		fast_binary_search::generate_variations(test_guides[i], variations);
-
-//		std::sort(variations.begin() + 1, variations.end());		// +1 because the first element is the test guide
-
-		std::vector<uint64_t> matches;
-		std::vector<size_t> positions;
-		fast_binary_search::compute_intersection_list(variations.data(), variations.size(), packed_genome_guides.data(), packed_genome_guides.size(), matches, positions);
-
-		all_matches[i] = matches;
-		all_positions[i] = positions;
+		fast_binary_search::compute_intersection_list(variations.data(), variations.size(), packed_genome_guides.data(), packed_genome_guides.size(), all_positions[i]);
 		}
 	}
 
@@ -508,7 +494,6 @@ int main(int argc, const char *argv[])
 	/*
 		Create space to put the results
 	*/
-	all_matches.resize(test_guides.size());
 	all_positions.resize(test_guides.size());
 
 	/*
@@ -551,13 +536,13 @@ int main(int argc, const char *argv[])
 		Calculate the statistics
 	*/
 	double sum_matches = 0.0;
-	size_t min_matches = all_matches[0].size() + 1;
-	size_t max_matches = all_matches[0].size() - 1;
+	size_t min_matches = all_positions[0].size() + 1;
+	size_t max_matches = all_positions[0].size() - 1;
 //	size_t total_count = 0;
 	size_t empty_count = 0;
-	for (int i = 0; i < all_matches.size(); i++)
+	for (int i = 0; i < all_positions.size(); i++)
 		{
-		size_t num_matches = all_matches[i].size() - 1;
+		size_t num_matches = all_positions[i].size() - 1;
 		sum_matches += num_matches;
 		if (num_matches > 0)
 			empty_count++;
@@ -568,8 +553,8 @@ int main(int argc, const char *argv[])
 		if ((min_matches == max_matches) && i > 0)
 			std::cout << "OOPS! min = " << min_matches << "max = " << max_matches << ", i = " << i << std::endl;
 		}
-//	total_count = all_matches.size() - empty_count;
-	double mean_matches = sum_matches / all_matches.size();
+//	total_count = all_positions.size() - empty_count;
+	double mean_matches = sum_matches / all_positions.size();
 
 	/*
 		Dump the statistics
