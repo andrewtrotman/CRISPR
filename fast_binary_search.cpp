@@ -24,8 +24,18 @@
 #include <iostream>
 #include <algorithm>
 
-#define __AVX512F__ 0
-//#undef __AVX512F__
+#define __AVX512F__ 1
+#undef __AVX512F__
+
+#ifdef __APPLE__
+        #define forceinline __attribute__((always_inline)) inline
+#elif defined(__GNUC__)
+        #define forceinline __attribute__((always_inline)) inline
+#elif defined(_MSC_VER)
+        #define forceinline __forceinline
+#else
+        #define forceinline inline
+#endif
 
 namespace fast_binary_search
 	{
@@ -89,7 +99,7 @@ namespace fast_binary_search
 		PACK20MER()
 		-----------
 	*/
-	uint64_t pack20mer(const char *sequence)
+	forceinline uint64_t pack20mer(const char *sequence)
 		{
 		uint64_t packed = 0;
 
@@ -103,7 +113,7 @@ namespace fast_binary_search
 		UNPACK20MER()
 		-------------
 	*/
-	std::string unpack20mer(uint64_t packed_sequence)
+	forceinline std::string unpack20mer(uint64_t packed_sequence)
 		{
 		std::string sequence;
 		for (int32_t pos = 19; pos >= 0; pos--)
@@ -132,20 +142,26 @@ namespace fast_binary_search
 		AVX_BINARY_SEARCH()
 		-------------------
 	*/
-	__m512i avx_binary_search(const uint64_t *array, __m512i lower, __m512i upper, __m512i key)
+	forceinline __m512i avx_binary_search(__m512i lower, __m512i upper, __m512i key)
 		{
 		__m512i one = _mm512_set1_epi64(1);
-		__mmask8 not_finished = 0;
+		lower = _mm512_srli_epi64(lower, 3);					// Convert from pointers to indexes
+		lower = _mm512_sub_epi64(lower, one);					// Necessary because the binary search counts from 1 (not from 0)
+		upper = _mm512_srli_epi64(upper, 3);					// Convert from pointers to indexes
+		__mmask8 not_finished;
 
+		/*
+			Binary search
+		*/
 		while ((not_finished = _mm512_cmpneq_epi64_mask(_mm512_add_epi64(lower, one), upper)) != 0x00)
 			{
 			__m512i middle = _mm512_srli_epi64(_mm512_add_epi64(upper, lower), 1);
-			__mmask8 results = _mm512_cmplt_epi64_mask(_mm512_i64gather_epi64(middle, array, sizeof(uint64_t)), key);
+			__mmask8 results = _mm512_cmplt_epi64_mask(_mm512_i64gather_epi64(middle, nullptr, sizeof(uint64_t)), key);
 			lower = _mm512_mask_blend_epi64 (not_finished & results, lower, middle);
 			upper = _mm512_mask_blend_epi64 (not_finished & ~results, upper, middle);
 			}
 
-		return upper;
+		return _mm512_slli_epi64(upper, 3);		// convert back into pointers
 		}
 #endif
 
@@ -160,6 +176,26 @@ namespace fast_binary_search
 		const uint64_t *key_end = key + key_length;
 		const uint64_t *current_key = key + 1;
 
+#ifdef NEVER
+uint64_t misalign = ((64 - ((uint64_t)current_key & 63)) & 63) >> 3;
+//std::cout << "Misalign: " << misalign << "\n";
+const uint64_t *first_key_end = current_key + misalign;
+
+		/*
+			Align on AVX512 boundary before processing
+		*/
+		while (current_key < first_key_end)
+			{
+			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
+			if (index[index_key] != index[index_key + 1])
+				{
+				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
+				if (*found == *current_key)
+					positions.push_back(found);
+				}
+			current_key++;
+			}
+#endif
 		/*
 			Do the AVX512 stuff first
 		*/
@@ -181,21 +217,14 @@ namespace fast_binary_search
 			__m512i end_set = _mm512_i64gather_epi64(_mm512_add_epi64(index_key_set, one), &index[0], sizeof(uint64_t *));
 
 			/*
-				We now have the start and end positions as pointers.
-				FIX: At present we convert them into indexes by dividing by 8, but could avoid that by changing the binary search to use pointers rather than indexes - which is to change the 8 in the gather to a 1.
+				Do the AVX512-parallel binary search given the pointers
 			*/
-			start_set = _mm512_srli_epi64(start_set, 3);
-			start_set = _mm512_sub_epi64(start_set, one);					// FIX THIS - its only necessary because the binary search counts from 1.
-			end_set = _mm512_srli_epi64(end_set, 3);
+			__m512i found_pointers = avx_binary_search(start_set, end_set, key_set);
 
-			/*
-				Do the AVX512-parallel binary search
-			*/
-			__m512i found_pointers = avx_binary_search(nullptr, start_set, end_set, key_set);
 			/*
 				At this point found_set is a set of pointers to the data - which may or may not match the key (same as the result of std::lower_bound())
 			*/
-			__m512i found_values = _mm512_i64gather_epi64(found_pointers, nullptr, 8);		// 1 because found_set is a set of pointers to 64-bit integers
+			__m512i found_values = _mm512_i64gather_epi64(found_pointers, nullptr, 1);		// 1 because found_set is a set of pointers to 64-bit integers
 			__mmask8 found_masks = _mm512_cmpeq_epi64_mask(key_set, found_values);
 
 			if (found_masks != 0)
@@ -204,7 +233,10 @@ namespace fast_binary_search
 					I really want to write directly into the positions vector, but it isn't clear how large it needs to be pre-allocated
 				*/
 				alignas(64) uint64_t *position[8];
-				_mm512_mask_compressstore_epi64 (&position[0], found_masks, found_pointers);
+				_mm512_mask_compressstoreu_epi64 (&position[0], found_masks, found_pointers);
+
+//std::cout << *position[0] << " : AVX\n";
+//exit(0);
 				switch(__popcnt16(found_masks))
 					{
 					case 8:
@@ -239,10 +271,7 @@ namespace fast_binary_search
 				{
 				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
 				if (*found == *current_key)
-					{
 					positions.push_back(found);
-//std::cout << "[" << found - data << "," << *found << "]";
-					}
 				}
 			current_key++;
 			}
