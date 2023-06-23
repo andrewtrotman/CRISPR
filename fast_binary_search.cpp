@@ -178,26 +178,6 @@ namespace fast_binary_search
 		const uint64_t *key_end = key + key_length;
 		const uint64_t *current_key = key + 1;
 
-#ifdef NEVER
-uint64_t misalign = ((64 - ((uint64_t)current_key & 63)) & 63) >> 3;
-//std::cout << "Misalign: " << misalign << "\n";
-const uint64_t *first_key_end = current_key + misalign;
-
-		/*
-			Align on AVX512 boundary before processing
-		*/
-		while (current_key < first_key_end)
-			{
-			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
-			if (index[index_key] != index[index_key + 1])
-				{
-				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
-				if (*found == *current_key)
-					positions.push_back(found);
-				}
-			current_key++;
-			}
-#endif
 		/*
 			Do the AVX512 stuff first
 		*/
@@ -237,8 +217,6 @@ const uint64_t *first_key_end = current_key + misalign;
 				alignas(64) uint64_t *position[8];
 				_mm512_mask_compressstoreu_epi64 (&position[0], found_masks, found_pointers);
 
-//std::cout << *position[0] << " : AVX\n";
-//exit(0);
 				switch(__popcnt16(found_masks))
 					{
 					case 8:
@@ -269,8 +247,33 @@ const uint64_t *first_key_end = current_key + misalign;
 		while (current_key < key_end)
 			{
 			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
-			if (index[index_key] != index[index_key + 1])
+			size_t mers_to_search = index[index_key + 1] - index[index_key];
+			if (mers_to_search == 0)
 				{
+				/*
+					Nothing
+				*/
+				}
+//#ifdef NEVER
+			else if (mers_to_search < 4)
+				{
+				/*
+					If the length of the list is short then
+					Linear search in an ordered list
+				*/
+				const uint64_t *where = index[index_key];
+				while (*where < *current_key)
+					where++;
+				if (*where == *current_key)
+					positions.push_back(where);
+				}
+//#endif
+			else
+				{
+				/*
+					If the length of the list is long then
+					Binary search in an ordered list
+				*/
 				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
 				if (*found == *current_key)
 					positions.push_back(found);
@@ -384,31 +387,15 @@ const uint64_t *first_key_end = current_key + misalign;
 			{
 			uint64_t shifter = (19 - i) * 2;
 
-			uint64_t was = (sequence >> shifter) & 3;
-			uint64_t knock_out = (sequence & ~(3ULL << shifter));
-			switch(was)
-				{
-				case 0:
-					generate_variations_binary(knock_out | (1ULL << shifter), variations, replacements + 1, i + 1);
-					generate_variations_binary(knock_out | (2ULL << shifter), variations, replacements + 1, i + 1);
-					generate_variations_binary(knock_out | (3ULL << shifter), variations, replacements + 1, i + 1);
-					break;
-				case 1:
-					generate_variations_binary(knock_out | (0ULL << shifter), variations, replacements + 1, i + 1);
-					generate_variations_binary(knock_out | (2ULL << shifter), variations, replacements + 1, i + 1);
-					generate_variations_binary(knock_out | (3ULL << shifter), variations, replacements + 1, i + 1);
-					break;
-				case 2:
-					generate_variations_binary(knock_out | (0ULL << shifter), variations, replacements + 1, i + 1);
-					generate_variations_binary(knock_out | (1ULL << shifter), variations, replacements + 1, i + 1);
-					generate_variations_binary(knock_out | (3ULL << shifter), variations, replacements + 1, i + 1);
-					break;
-				case 3:
-					generate_variations_binary(knock_out | (0ULL << shifter), variations, replacements + 1, i + 1);
-					generate_variations_binary(knock_out | (1ULL << shifter), variations, replacements + 1, i + 1);
-					generate_variations_binary(knock_out | (2ULL << shifter), variations, replacements + 1, i + 1);
-					break;
-				}
+			/*
+				This optimisation is from Timothy Chappell who points out that by XORing the
+				current base with 01, 02, and 03 you automatically get all the variants except the
+				original sequence (but not necessarily in a predictable order).  So we don't need to
+				mask and replace, we simply xor with the original sequence and call outselves recursively.
+			*/
+			generate_variations_binary(sequence ^ (1ULL << shifter), variations, replacements + 1, i + 1);
+			generate_variations_binary(sequence ^ (2ULL << shifter), variations, replacements + 1, i + 1);
+			generate_variations_binary(sequence ^ (3ULL << shifter), variations, replacements + 1, i + 1);
 			}
 		}
 
@@ -481,7 +468,7 @@ int main(int argc, const char *argv[])
 	std::vector<std::string> test_guides;
 	if (true)
 		{
-		TESTSIZE = 5000;
+		TESTSIZE = 1000;
 		test_guides.resize(TESTSIZE);
 		fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
 		fast_binary_search::select_pseudo_random_vectors(test_guides, packed_genome_guides);
