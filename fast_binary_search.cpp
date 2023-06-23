@@ -346,7 +346,7 @@ namespace fast_binary_search
 		SELECT_PSEUDO_RANDOM_VECTORS()
 		------------------------------
 	*/
-	void select_pseudo_random_vectors(std::vector<std::string> &selected, const std::vector<uint64_t> &guides)
+	void select_pseudo_random_vectors(std::vector<uint64_t> &selected, const std::vector<uint64_t> &guides)
 		{
 		uint64_t seed = 17;
 		uint64_t m = guides.size() - 1;		// Modulus parameter
@@ -356,7 +356,7 @@ namespace fast_binary_search
 
 		for (uint64_t which = 0; which < selected.size(); which++)
 			{
-			selected[which] = unpack20mer(guides[next]);
+			selected[which] = guides[next];
 			next = ((next * a) + c) % m;
 			}
 		}
@@ -365,7 +365,7 @@ namespace fast_binary_search
 		SELECT_RANDOM_VECTORS()
 		-----------------------
 	*/
-	void select_random_vectors(std::vector<std::string> &selected, const std::vector<uint64_t>& guides)
+	void select_random_vectors(std::vector<uint64_t> &selected, const std::vector<uint64_t> &guides)
 		{
 //		constexpr int seed = 13;
 		constexpr int seed = 17;
@@ -373,14 +373,14 @@ namespace fast_binary_search
 		std::uniform_int_distribution<int> distribution(0, guides.size() - 1);
 
 		for (size_t which = 0; which < selected.size(); which++)
-			selected[which] = unpack20mer(guides[distribution(random)]);
+			selected[which] = guides[distribution(random)];
 		}
 
 	/*
 		GENERATE_VARIATIONS_BINARY()
 		----------------------------
 	*/
-	void generate_variations_binary(uint64_t sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
+	void generate_variations_binary(uint64_t sequence, std::vector<uint64_t> &variations, int replacements = 0, int position = 0)
 		{
 		variations.push_back(sequence);
 		if (replacements == 4)
@@ -393,7 +393,7 @@ namespace fast_binary_search
 				This optimisation is from Timothy Chappell who points out that by XORing the
 				current base with 01, 02, and 03 you automatically get all the variants except the
 				original sequence (but not necessarily in a predictable order).  So we don't need to
-				mask and replace, we simply xor with the original sequence and call outselves recursively.
+				mask and replace, we simply XOR with the original sequence and call outselves recursively.
 			*/
 			generate_variations_binary(sequence ^ (1ULL << shifter), variations, replacements + 1, i + 1);
 			generate_variations_binary(sequence ^ (2ULL << shifter), variations, replacements + 1, i + 1);
@@ -405,9 +405,18 @@ namespace fast_binary_search
 		GENERATE_VARIATIONS()
 		---------------------
 	*/
-	void generate_variations(std::string& sequence, std::vector<uint64_t>& variations, int replacements = 0, int position = 0)
+	void generate_variations(std::string &sequence, std::vector<uint64_t> &variations, int replacements = 0, int position = 0)
 		{
 		generate_variations_binary(pack20mer(sequence.c_str()), variations, replacements, position);
+		}
+
+	/*
+		GENERATE_VARIATIONS()
+		---------------------
+	*/
+	void generate_variations(uint64_t sequence, std::vector<uint64_t> &variations, int replacements = 0, int position = 0)
+		{
+		generate_variations_binary(sequence, variations, replacements, position);
 		}
 }
 
@@ -425,13 +434,21 @@ size_t TESTSIZE = 1000;
 	PROCESS_CHUNK()
 	---------------
 */
-void process_chunk(size_t start, size_t end, std::vector<std::string> &test_guides, std::vector<uint64_t> &packed_genome_guides)
+void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides)
 	{
-	for (size_t i = start; i < end; ++i)
+	uint64_t previous = ~0;
+	std::vector<uint64_t> variations;
+	for (size_t which = start; which < end; which++)
 		{
-		std::vector<uint64_t> variations;
-		fast_binary_search::generate_variations(test_guides[i], variations);
-		fast_binary_search::compute_intersection_list(variations.data(), variations.size(), packed_genome_guides.data(), packed_genome_guides.size(), all_positions[i]);
+		if (test_guides[which] != previous)
+			{
+			variations.clear();
+			fast_binary_search::generate_variations(test_guides[which], variations);
+			fast_binary_search::compute_intersection_list(variations.data(), variations.size(), packed_genome_guides.data(), packed_genome_guides.size(), all_positions[which]);
+			previous = test_guides[which];
+			}
+//		else
+//			std::cout << "*** Dropped one ***\n";
 		}
 	}
 
@@ -467,20 +484,21 @@ int main(int argc, const char *argv[])
 	/*
 		Generate some samples (sometimes random, and sometimes not, so keep both versions)
 	*/
-	std::vector<std::string> test_guides;
+	std::vector<uint64_t> test_guides;
 	if (true)
 		{
-		TESTSIZE = 1000;
+		TESTSIZE = 10'000;
 		test_guides.resize(TESTSIZE);
-		fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
+//		fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
 		fast_binary_search::select_pseudo_random_vectors(test_guides, packed_genome_guides);
+		sort(test_guides.begin(), test_guides.end());
 		}
 	else
 		{
 		TESTSIZE = packed_genome_guides.size();
 		test_guides.resize(TESTSIZE);
 		for (size_t which = 0; which < TESTSIZE; which++)
-			test_guides[which] = fast_binary_search::unpack20mer(packed_genome_guides[which]);
+			test_guides[which] = packed_genome_guides[which];
 		}
 
 	std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
@@ -504,7 +522,7 @@ int main(int argc, const char *argv[])
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-	thread_count = 1;
+	// thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
@@ -546,16 +564,19 @@ int main(int argc, const char *argv[])
 	size_t empty_count = 0;
 	for (int i = 0; i < all_positions.size(); i++)
 		{
-		size_t num_matches = all_positions[i].size() - 1;
-		sum_matches += num_matches;
-		if (num_matches > 0)
+		if (all_positions[i].size() == 0)			// some will have been dropped because they are duplicates
 			empty_count++;
-		if (num_matches > max_matches)
-			max_matches = num_matches;
-		if (num_matches < min_matches)
-			min_matches = num_matches;
-		if ((min_matches == max_matches) && i > 0)
-			std::cout << "OOPS! min = " << min_matches << "max = " << max_matches << ", i = " << i << std::endl;
+		else
+			{
+			size_t num_matches = all_positions[i].size() - 1;
+			sum_matches += num_matches;
+			if (num_matches > max_matches)
+				max_matches = num_matches;
+			if (num_matches < min_matches)
+				min_matches = num_matches;
+			if ((min_matches == max_matches) && i > 0)
+				std::cout << "OOPS! min = " << min_matches << "max = " << max_matches << ", i = " << i << std::endl;
+			}
 		}
 //	total_count = all_positions.size() - empty_count;
 	double mean_matches = sum_matches / all_positions.size();
