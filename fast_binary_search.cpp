@@ -26,8 +26,10 @@
 #include <iostream>
 #include <algorithm>
 
-#define __AVX512F__ 1
-#undef __AVX512F__
+/*
+	Define USE_AVX512F to use the AVX512 binary search - which on old AVX512 machines is slightly slower than using scalar operations
+*/
+#undef USE_AVX512F
 
 #ifdef __APPLE__
         #define forceinline __attribute__((always_inline)) inline
@@ -139,7 +141,7 @@ namespace fast_binary_search
 		return sequence;
 		}
 
-#ifdef __AVX512F__
+#ifdef USE_AVX512F
 	/*
 		AVX_BINARY_SEARCH()
 		-------------------
@@ -181,7 +183,7 @@ namespace fast_binary_search
 		/*
 			Do the AVX512 stuff first
 		*/
-#ifdef __AVX512F__
+#ifdef USE_AVX512F
 		__m512i one = _mm512_set1_epi64(1);
 
 		while (current_key + 8 < key_end)
@@ -251,23 +253,23 @@ namespace fast_binary_search
 			if (mers_to_search == 0)
 				{
 				/*
-					Nothing
+					Nothing, the list is empty.
 				*/
 				}
-//#ifdef NEVER
-			else if (mers_to_search < 4)
+			else if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
 				{
 				/*
 					If the length of the list is short then
 					Linear search in an ordered list
 				*/
-				const uint64_t *where = index[index_key];
-				while (*where < *current_key)
-					where++;
-				if (*where == *current_key)
-					positions.push_back(where);
+				const uint64_t *found;
+				for (found = index[index_key]; *found < *current_key; found++)
+					{
+					/* Nothing */
+					}
+				if (*found == *current_key)
+					positions.push_back(found);
 				}
-//#endif
 			else
 				{
 				/*
