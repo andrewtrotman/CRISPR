@@ -4,7 +4,7 @@ at_hammingDist : at_hammingDist.cpp
 	g++ -std=c++14 -pthread -O3 -Wall -mavx2 -mavx512f -march=native at_hammingDist.cpp -o at_hammingDist
 
 fast_binary_search : fast_binary_search.cpp 
-	g++ -std=c++11 -pthread -O3 -Wall -march=native fast_binary_search.cpp -o fast_binary_search
+	g++ -std=c++11 -pthread -O3 -Wall -mavx2 -mavx512f -march=native fast_binary_search.cpp -o fast_binary_search
 
 avx512_binary_search: avx512_binary_search.cpp 
 	g++ -std=c++14 -pthread -O3 -Wall -mavx2 -mavx512f -march=native avx512_binary_search.cpp -o avx512_binary_search
