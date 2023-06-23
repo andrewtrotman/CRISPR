@@ -481,7 +481,7 @@ int main(int argc, const char *argv[])
 	std::vector<std::string> test_guides;
 	if (true)
 		{
-		TESTSIZE = 1000;
+		TESTSIZE = 5000;
 		test_guides.resize(TESTSIZE);
 		fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
 		fast_binary_search::select_pseudo_random_vectors(test_guides, packed_genome_guides);
@@ -515,7 +515,7 @@ int main(int argc, const char *argv[])
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-//	thread_count = 1;
+	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
