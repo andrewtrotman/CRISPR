@@ -25,7 +25,7 @@
 #include <algorithm>
 
 #define __AVX512F__ 0
-#undef __AVX512F__
+//#undef __AVX512F__
 
 namespace fast_binary_search
 	{
@@ -149,19 +149,6 @@ namespace fast_binary_search
 		}
 #endif
 
-#ifdef __AVX512F__
-	/*
-		COMPUTE_INTERSECTION_LIST_AVX_HELPER()
-		--------------------------------------
-	*/
-	inline void compute_intersection_list_avx_helper(std::vector<const uint64_t *> &positions, uint64_t position)
-		{
-		positions.push_back((uint64_t *)(position * 8));
-//		std::cout << "[" << (uint64_t *)(position * 8) - data  << "," << match << "]";
-		}
-#endif
-
-
 	/*
 		COMPUTE_INTERSECTION_LIST()
 		---------------------------
@@ -191,8 +178,7 @@ namespace fast_binary_search
 				Compute the start and end of the ranges
 			*/
 			__m512i start_set = _mm512_i64gather_epi64(index_key_set, &index[0], sizeof(uint64_t *));
-			index_key_set = _mm512_add_epi64(index_key_set, one);
-			__m512i end_set = _mm512_i64gather_epi64(index_key_set, &index[0], sizeof(uint64_t *));
+			__m512i end_set = _mm512_i64gather_epi64(_mm512_add_epi64(index_key_set, one), &index[0], sizeof(uint64_t *));
 
 			/*
 				We now have the start and end positions as pointers.
@@ -205,41 +191,39 @@ namespace fast_binary_search
 			/*
 				Do the AVX512-parallel binary search
 			*/
-		__m512i found_pointers = avx_binary_search(nullptr, start_set, end_set, key_set);
-		/*
-			At this point found_set is a set of pointers to the data - which may or may not match the key (same as the result of std::lower_bound())
-		*/
-		__m512i found_values = _mm512_i64gather_epi64(found_pointers, nullptr, 8);		// 1 because found_set is a set of pointers to 64-bit integers
-		__mmask8 found_masks = _mm512_cmpeq_epi64_mask(key_set, found_values);
+			__m512i found_pointers = avx_binary_search(nullptr, start_set, end_set, key_set);
+			/*
+				At this point found_set is a set of pointers to the data - which may or may not match the key (same as the result of std::lower_bound())
+			*/
+			__m512i found_values = _mm512_i64gather_epi64(found_pointers, nullptr, 8);		// 1 because found_set is a set of pointers to 64-bit integers
+			__mmask8 found_masks = _mm512_cmpeq_epi64_mask(key_set, found_values);
 
 			if (found_masks != 0)
 				{
 				/*
-					Change this to masked write then a switch to insert
+					I really want to write directly into the positions vector, but it isn't clear how large it needs to be pre-allocated
 				*/
-				uint64_t position[8];
-				_mm512_storeu_epi64(&position[0], found_pointers);
-
-				/*
-					I really want ot use the found_mask to write the results to the positon and match vectors, but at present can't
-					because that vector does not have its size pre-computed (i.e. the contents has not been allocated yet).
-				*/
-				if (found_masks & 0x01)
-					compute_intersection_list_avx_helper(positions, position[0]);
-				if (found_masks & 0x02)
-					compute_intersection_list_avx_helper(positions, position[1]);
-				if (found_masks & 0x04)
-					compute_intersection_list_avx_helper(positions, position[2]);
-				if (found_masks & 0x08)
-					compute_intersection_list_avx_helper(positions, position[3]);
-				if (found_masks & 0x10)
-					compute_intersection_list_avx_helper(positions, position[4]);
-				if (found_masks & 0x20)
-					compute_intersection_list_avx_helper(positions, position[5]);
-				if (found_masks & 0x40)
-					compute_intersection_list_avx_helper(positions, position[6]);
-				if (found_masks & 0x80)
-					compute_intersection_list_avx_helper(positions, position[7]);
+				alignas(64) uint64_t *position[8];
+				_mm512_mask_compressstore_epi64 (&position[0], found_masks, found_pointers);
+				switch(__popcnt16(found_masks))
+					{
+					case 8:
+						positions.push_back(position[7]);			// FALL THROUGH
+					case 7:
+						positions.push_back(position[6]);			// FALL THROUGH
+					case 6:
+						positions.push_back(position[5]);			// FALL THROUGH
+					case 5:
+						positions.push_back(position[4]);			// FALL THROUGH
+					case 4:
+						positions.push_back(position[3]);			// FALL THROUGH
+					case 3:
+						positions.push_back(position[2]);			// FALL THROUGH
+					case 2:
+						positions.push_back(position[1]);			// FALL THROUGH
+					case 1:
+						positions.push_back(position[0]);			// FALL THROUGH
+					}
 				}
 			current_key += 8;
 			}
@@ -500,7 +484,7 @@ int main(int argc, const char *argv[])
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-	thread_count = 1;
+//	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
