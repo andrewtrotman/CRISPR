@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <immintrin.h>
 
@@ -15,6 +16,7 @@
 	#include <unistd.h>
 
 	#define __popcnt16 __builtin_popcount
+	#define __popcnt64 __builtin_popcountll
 #endif
 
 #include <thread>
@@ -41,6 +43,81 @@
         #define forceinline inline
 #endif
 
+namespace hamming_distance
+	{
+	/*
+		Fast lookup for encoding encoded kmers
+	*/
+	static uint64_t kmer_encoding_table[256];
+
+	/*
+		PACK20MER()
+		-----------
+	*/
+	forceinline uint64_t pack20mer(const char *sequence)
+		{
+		uint64_t packed = 0;
+
+		for (int pos = 0; pos < 20; pos++)
+			packed = (packed << 3) | kmer_encoding_table[(size_t)sequence[pos]];
+
+		return packed;
+		}
+
+	/*
+		UNPACK20MER()
+		-------------
+	*/
+	forceinline std::string unpack20mer(uint64_t packed_sequence)
+		{
+		std::string sequence;
+		for (int32_t pos = 19; pos >= 0; pos--)
+			{
+			switch ((packed_sequence >> (pos * 3)) & 7)
+				{
+				case 1:
+					sequence += 'A';
+					break;
+				case 2:
+					sequence += 'C';
+					break;
+				case 4:
+					sequence += 'G';
+					break;
+				case 7:
+					sequence += 'T';
+					break;
+				default:
+					sequence += 'N';
+					break;
+				}
+			}
+		return sequence;
+		}
+
+	/*
+		HAMMING_DISTANCE()
+		------------------
+	*/
+	forceinline uint64_t hamming_distance(uint64_t a, uint64_t b)
+		{
+		return __popcnt64(a ^ b);
+		}
+
+	/*
+		COMPUTE_HAMMING_SET()
+		---------------------
+	*/
+	void compute_hamming_set(uint64_t twice_the_max_distance, uint64_t key, const uint64_t *data, size_t data_length, std::vector<const uint64_t *> &positions)
+		{
+		const uint64_t *end = data + data_length;
+
+		for (const uint64_t *which = data; which < end; which++)
+			if (hamming_distance(key, *which) <= twice_the_max_distance)
+				positions.push_back(which);
+		}
+	}
+
 namespace fast_binary_search
 	{
 	/*
@@ -51,7 +128,7 @@ namespace fast_binary_search
 	constexpr size_t base_width_in_bits = 2;
 
 	/*
-		Fast lookup for decoding encoded kmers
+		Fast lookup for encoding encoded kmers
 	*/
 	static uint64_t kmer_encoding_table[256];
 
@@ -312,35 +389,6 @@ namespace fast_binary_search
 	return contents;
 	}
 
-	/*
-		LOAD_GUIDES()
-		-------------
-	*/
-	std::vector<uint64_t> load_guides(const std::string &filename)
-		{
-		std::vector<uint64_t> packed_guides;
-		char *guide;
-		char *data = read_entire_file(filename.c_str());
-		if (data == NULL)
-			{
-			std::cerr << "Error opening guide file: " << filename << std::endl;
-			exit(1);
-			}
-
-		guide = data - 1;
-		do
-			{
-			guide++;
-			packed_guides.push_back(pack20mer(guide));
-			guide = strchr(guide, '\n');
-			}
-		while (guide != NULL && *(guide + 1) != '\0');
-
-		std::sort(packed_guides.begin(), packed_guides.end());
-		free(data);
-
-		return packed_guides;
-		}
 
 	/*
 		SELECT_PSEUDO_RANDOM_VECTORS()
@@ -421,6 +469,37 @@ namespace fast_binary_search
 }
 
 /*
+	LOAD_GUIDES()
+	-------------
+*/
+template <typename F>
+std::vector<uint64_t> load_guides(const std::string &filename, F pack20mer)
+	{
+	std::vector<uint64_t> packed_guides;
+	char *guide;
+	char *data = fast_binary_search::read_entire_file(filename.c_str());
+	if (data == NULL)
+		{
+		std::cerr << "Error opening guide file: " << filename << std::endl;
+		exit(1);
+		}
+
+	guide = data - 1;
+	do
+		{
+		guide++;
+		packed_guides.push_back(pack20mer(guide));
+		guide = strchr(guide, '\n');
+		}
+	while (guide != NULL && *(guide + 1) != '\0');
+
+	std::sort(packed_guides.begin(), packed_guides.end());
+	free(data);
+
+	return packed_guides;
+	}
+
+/*
 	Allocate space for the final set of results
 */
 std::vector<std::vector<const uint64_t *>> all_positions;
@@ -428,7 +507,12 @@ std::vector<std::vector<const uint64_t *>> all_positions;
 /*
 	Command line parameters
 */
-size_t TESTSIZE = 1000;
+enum { FAST_BINARY_SEARCH, HAMMING_DISTANCE };
+const std::string mode_name[] = { "Binary Search", "Hamming Distance" };
+size_t TESTSIZE;
+int mode = FAST_BINARY_SEARCH;
+std::string guides_filename = "OryzaSativaGuides.txt";
+
 
 /*
 	PROCESS_CHUNK()
@@ -442,13 +526,18 @@ void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides,
 		{
 		if (test_guides[which] != previous)
 			{
-			variations.clear();
-			fast_binary_search::generate_variations(test_guides[which], variations);
-			fast_binary_search::compute_intersection_list(variations.data(), variations.size(), packed_genome_guides.data(), packed_genome_guides.size(), all_positions[which]);
-			previous = test_guides[which];
+			if (mode == FAST_BINARY_SEARCH)
+				{
+				variations.clear();
+				fast_binary_search::generate_variations(test_guides[which], variations);
+				fast_binary_search::compute_intersection_list(variations.data(), variations.size(), packed_genome_guides.data(), packed_genome_guides.size(), all_positions[which]);
+				previous = test_guides[which];
+				}
+			else
+				hamming_distance::compute_hamming_set(8, test_guides[which], packed_genome_guides.data(), packed_genome_guides.size(), all_positions[which]);
 			}
 //		else
-//			std::cout << "*** Dropped one ***\n";
+//			std::cout << "*** Ignore duplicate ***\n";
 		}
 	}
 
@@ -456,9 +545,14 @@ void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides,
 	USAGE()
 	-------
 */
-void usage(const char *exename)
+int usage(const char *exename)
 	{
-	std::cout << "Usage:" << exename << "[-b<index_width_in_bases>] [-t<TESTSIZE>]\n";
+	std::cout << "Usage:" << exename << "[-b | -h] [-f<filename>]\n";
+	std::cout << "       -b for binary search [default]\n";
+	std::cout << "       -h for hamming distance\n";
+	std::cout << "       -f<filename> use <filename> as the genome\n";
+
+	return 0;
 	}
 
 /*
@@ -469,6 +563,39 @@ int main(int argc, const char *argv[])
 	{
 	auto start_main = std::chrono::steady_clock::now(); // Start timing
 
+	if (argc <= 4)
+		{
+		for (int arg = 1; arg < argc; arg++)
+			{
+			if (std::string(argv[arg]) == "-b")
+				mode = FAST_BINARY_SEARCH;
+			else if (std::string(argv[arg]) == "-h")
+				mode = HAMMING_DISTANCE;
+			else if (strncmp(argv[arg], "-f", 2) == 0)
+				{
+				if (strlen(argv[arg]) == 2)
+					guides_filename = std::string(argv[++arg]);
+				else
+					guides_filename = std::string(argv[arg] + 2);
+				}
+			else
+				{
+				std::cout << "unknown paramter:" << argv[arg] << "\n";
+				exit(usage(argv[0]));
+				}
+			}
+		}
+	else
+		exit(usage(argv[0]));
+
+	std::cout << "Processing using: " << mode_name[mode] << "\n";
+	std::cout << "Using file      : " << guides_filename << "\n";
+
+	hamming_distance::kmer_encoding_table[(size_t)'A'] = 1;
+	hamming_distance::kmer_encoding_table[(size_t)'C'] = 2;
+	hamming_distance::kmer_encoding_table[(size_t)'G'] = 4;
+	hamming_distance::kmer_encoding_table[(size_t)'T'] = 7;
+
 	fast_binary_search::kmer_encoding_table[(size_t)'A'] = 0;
 	fast_binary_search::kmer_encoding_table[(size_t)'C'] = 1;
 	fast_binary_search::kmer_encoding_table[(size_t)'G'] = 2;
@@ -478,16 +605,20 @@ int main(int argc, const char *argv[])
 		Read the guides from the file.
 		NOTE:load_guides() sorts the list after loading and before returning it.
 	*/
-	std::string guides_filename = "OryzaSativaGuides.txt";
-	std::vector<uint64_t> packed_genome_guides = fast_binary_search::load_guides(guides_filename);
+//	std::string guides_filename = "OryzaSativaGuides.txt";
+	std::vector<uint64_t> packed_genome_guides;
+	if (mode == FAST_BINARY_SEARCH)
+		packed_genome_guides = load_guides(guides_filename, fast_binary_search::pack20mer);
+	else
+		packed_genome_guides = load_guides(guides_filename, hamming_distance::pack20mer);
 
 	/*
 		Generate some samples (sometimes random, and sometimes not, so keep both versions)
 	*/
 	std::vector<uint64_t> test_guides;
-	if (true)
+	if (false)
 		{
-		TESTSIZE = 10'000;
+		TESTSIZE = 1000;
 		test_guides.resize(TESTSIZE);
 //		fast_binary_search::select_random_vectors(test_guides, packed_genome_guides);
 		fast_binary_search::select_pseudo_random_vectors(test_guides, packed_genome_guides);
@@ -506,7 +637,8 @@ int main(int argc, const char *argv[])
 	/*
 		Generate the index over the guides.
 	*/
-	fast_binary_search::compute_index(&packed_genome_guides[0], packed_genome_guides.size());
+	if (mode == FAST_BINARY_SEARCH)
+		fast_binary_search::compute_index(&packed_genome_guides[0], packed_genome_guides.size());
 
 	/*
 		Start timing.
@@ -574,8 +706,8 @@ int main(int argc, const char *argv[])
 				max_matches = num_matches;
 			if (num_matches < min_matches)
 				min_matches = num_matches;
-			if ((min_matches == max_matches) && i > 0)
-				std::cout << "OOPS! min = " << min_matches << "max = " << max_matches << ", i = " << i << std::endl;
+//			if ((min_matches == max_matches) && i > 0)
+//				std::cout << "OOPS! min = " << min_matches << "max = " << max_matches << ", i = " << i << std::endl;
 			}
 		}
 //	total_count = all_positions.size() - empty_count;

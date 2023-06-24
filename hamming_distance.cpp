@@ -65,54 +65,7 @@ char *read_entire_file(const char *filename)
 return contents;
 }
 
-char **buffer_to_list(char *buffer, uint64_t *lines)
-{
-char *pos, **line_list, **current_line;
-uint64_t n_frequency, r_frequency;
-
-n_frequency = r_frequency = 0;
-for (pos = buffer; *pos != '\0'; pos++)
-	if (*pos == '\n')
-		n_frequency++;
-	else if (*pos == '\r')
-		r_frequency++;
-
-*lines = r_frequency > n_frequency ? r_frequency : n_frequency;
-current_line = line_list = new (std::nothrow) char * [(size_t)(*lines + 2)]; 		// +1 in case the last line has no \n; +1 for a NULL at the end of the list
-
-if (line_list == NULL)		// out of memory!
-	return NULL;
-
-*current_line++ = pos = buffer;
-while (*pos != '\0')
-	{
-	if (*pos == '\n' || *pos == '\r')
-		{
-		*pos++ = '\0';
-		while (*pos == '\n' || *pos == '\r')
-			pos++;
-		*current_line++ = pos;
-		}
-	else
-		pos++;
-	}
-/*
-	We have a nasty case here.  If the last line has no CR/LF then we need to include it
-	but shove a NULL on the next line, but if the last line has a CR/LF then we need to avoid
-	adding a blank line to the end of the list.
-	NOTE: its 2012 and its a bit late to be finding this bug!!!
-*/
-if (**(current_line - 1) == '\0')
-	*(current_line - 1) = NULL;
-*current_line = NULL;
-
-*lines = current_line - line_list - 1;		// the true number of lines
-
-return line_list;
-}
-
-
-
+char **buffer_
 forceinline uint64_t hammingDistance(uint64_t a, uint64_t b)
 	{
 	uint64_t xorResult = a ^ b;
