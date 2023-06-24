@@ -616,7 +616,7 @@ int main(int argc, const char *argv[])
 		Generate some samples (sometimes random, and sometimes not, so keep both versions)
 	*/
 	std::vector<uint64_t> test_guides;
-	if (false)
+	if (true)
 		{
 		TESTSIZE = 1000;
 		test_guides.resize(TESTSIZE);
