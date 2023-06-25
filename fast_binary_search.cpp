@@ -131,6 +131,7 @@ namespace fast_binary_search
 		Fast lookup for encoding encoded kmers
 	*/
 	static uint64_t kmer_encoding_table[256];
+	static std::vector<uint64_t> in_genome_bitmap((1ULL << 32) / 64, 0);  // Bitmap array with 2^32 bits
 
 	/*
 		The index
@@ -164,10 +165,11 @@ namespace fast_binary_search
 			index[(*current >> ((20 - index_width_in_bases) * base_width_in_bits)) + 1] = current + 1;
 
 		/*
-			Remove nullptrs by setting the start of the current range to the start of the previous range. Now,
+			Remove nullptrs by setting the start of the current range to the start of the previous range.
 		*/
 		const uint64_t **index_end = &index[index.size() - 1];
 		const uint64_t **previous = &index[0];
+
 		for (const uint64_t **current = &index[0]; current < index_end; current++)
 			{
 			if (*current == nullptr)
@@ -245,6 +247,29 @@ namespace fast_binary_search
 		return _mm512_slli_epi64(upper, 3);		// convert back into pointers
 		}
 #endif
+
+	/*
+		IN_GENOME()
+		-----------
+	*/
+	forceinline bool in_genome(uint64_t key)
+		{
+		uint64_t index = key >> 8;
+		return in_genome_bitmap[index / 64] & (1ULL << (index % 64));
+		}
+
+    /*
+       BUILD_IN_GENOME_BITMAP()
+       ------------------------
+     */
+	forceinline void build_in_genome_bitmap(const std::vector<uint64_t> &integers)
+		{
+		for (uint64_t num : integers)
+			{
+			uint64_t index = num >> 8;
+			in_genome_bitmap[index / 64] |= (1ULL << (index % 64));  // Set the respective bit to 1
+			}
+		}
 
 	/*
 		COMPUTE_INTERSECTION_LIST()
@@ -325,37 +350,38 @@ namespace fast_binary_search
 		*/
 		while (current_key < key_end)
 			{
-			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
-			size_t mers_to_search = index[index_key + 1] - index[index_key];
-			if (mers_to_search == 0)
+			/*
+				This in_genome() check does exactly the same as the work to compute mers_to_search, but is faster
+				so we leave it in.
+			*/
+			if (in_genome(*current_key))
 				{
-				/*
-					Nothing, the list is empty.
-				*/
-				}
-			else if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
-				{
-				/*
-					If the length of the list is short then
-					Linear search in an ordered list
-				*/
-				const uint64_t *found;
-				for (found = index[index_key]; *found < *current_key; found++)
+				size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
+				size_t mers_to_search = index[index_key + 1] - index[index_key];
+				if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
 					{
-					/* Nothing */
+					/*
+						If the length of the list is short then
+						Linear search in an ordered list
+					*/
+					const uint64_t *found;
+					for (found = index[index_key]; *found < *current_key; found++)
+						{
+						/* Nothing */
+						}
+					if (*found == *current_key)
+						positions.push_back(found);
 					}
-				if (*found == *current_key)
-					positions.push_back(found);
-				}
-			else
-				{
-				/*
-					If the length of the list is long then
-					Binary search in an ordered list
-				*/
-				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
-				if (*found == *current_key)
-					positions.push_back(found);
+				else
+					{
+					/*
+						If the length of the list is long then
+						Binary search in an ordered list
+					*/
+					const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
+					if (*found == *current_key)
+						positions.push_back(found);
+					}
 				}
 			current_key++;
 			}
@@ -435,7 +461,12 @@ namespace fast_binary_search
 			return;
 		for (uint64_t i = position; i < 20; i++)
 			{
-			uint64_t shifter = (19 - i) * 2;
+			/*
+				If the first 16 bases are not in the genome then there is no point in making
+				variants in the last 4 positions (because they can't be in the genone either).
+			*/
+			if ((i > 15) && !in_genome(sequence))
+				return;
 
 			/*
 				This optimisation is from Timothy Chappell who points out that by XORing the
@@ -443,6 +474,7 @@ namespace fast_binary_search
 				original sequence (but not necessarily in a predictable order).  So we don't need to
 				mask and replace, we simply XOR with the original sequence and call outselves recursively.
 			*/
+			uint64_t shifter = (19 - i) * 2;
 			generate_variations_binary(sequence ^ (1ULL << shifter), variations, replacements + 1, i + 1);
 			generate_variations_binary(sequence ^ (2ULL << shifter), variations, replacements + 1, i + 1);
 			generate_variations_binary(sequence ^ (3ULL << shifter), variations, replacements + 1, i + 1);
@@ -638,7 +670,12 @@ int main(int argc, const char *argv[])
 		Generate the index over the guides.
 	*/
 	if (mode == FAST_BINARY_SEARCH)
+		{
+		std::vector<uint64_t> bitmap((1ULL << 32) / 64, 0);  // Bitmap array with 2^32 bits
 		fast_binary_search::compute_index(&packed_genome_guides[0], packed_genome_guides.size());
+		fast_binary_search::build_in_genome_bitmap(packed_genome_guides);
+		std::cout << "Bitmap of size " << bitmap.size() * 8 << " bits was set up" << std::endl;
+		}
 
 	/*
 		Start timing.
@@ -654,7 +691,7 @@ int main(int argc, const char *argv[])
 		Allocate the thread pool
 	*/
 	size_t thread_count = std::thread::hardware_concurrency();
-	// thread_count = 1;
+//	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
