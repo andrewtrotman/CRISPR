@@ -366,38 +366,31 @@ namespace fast_binary_search
 		*/
 		while (current_key < key_end)
 			{
-			/*
-				This in_genome() check does exactly the same as the work to compute mers_to_search, but is faster
-				so we leave it in.
-			*/
-			if (in_genome(*current_key))
+			size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
+			size_t mers_to_search = index[index_key + 1] - index[index_key];
+			if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
 				{
-				size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
-				size_t mers_to_search = index[index_key + 1] - index[index_key];
-				if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
+				/*
+					If the length of the list is short then
+					Linear search in an ordered list
+				*/
+				const uint64_t *found;
+				for (found = index[index_key]; *found < *current_key; found++)
 					{
-					/*
-						If the length of the list is short then
-						Linear search in an ordered list
-					*/
-					const uint64_t *found;
-					for (found = index[index_key]; *found < *current_key; found++)
-						{
-						/* Nothing */
-						}
-					if (*found == *current_key)
-						positions.push_back(found);
+					/* Nothing */
 					}
-				else
-					{
-					/*
-						If the length of the list is long then
-						Binary search in an ordered list
-					*/
-					const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
-					if (*found == *current_key)
-						positions.push_back(found);
-					}
+				if (*found == *current_key)
+					positions.push_back(found);
+				}
+			else
+				{
+				/*
+					If the length of the list is long then
+					Binary search in an ordered list
+				*/
+				const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
+				if (*found == *current_key)
+					positions.push_back(found);
 				}
 			current_key++;
 			}
@@ -430,7 +423,6 @@ namespace fast_binary_search
 			}
 	return contents;
 	}
-
 
 	/*
 		SELECT_PSEUDO_RANDOM_VECTORS()
@@ -472,7 +464,8 @@ namespace fast_binary_search
 	*/
 	void generate_variations_binary(uint64_t sequence, std::vector<uint64_t> &variations, int replacements = 0, int position = 0)
 		{
-		variations.push_back(sequence);
+		if (in_genome(sequence))
+			variations.push_back(sequence);
 		if (replacements == 4)
 			return;
 		for (uint64_t i = position; i < 20; i++)
@@ -481,7 +474,7 @@ namespace fast_binary_search
 				If the first 16 bases are not in the genome then there is no point in making
 				variants in the last 4 positions (because they can't be in the genone either).
 			*/
-			if ((i > 15) && !in_genome_head(sequence))
+			if (i == 16 && !in_genome_head(sequence))
 				return;
 
 			/*
