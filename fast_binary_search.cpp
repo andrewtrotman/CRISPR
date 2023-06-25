@@ -132,6 +132,7 @@ namespace fast_binary_search
 	*/
 	static uint64_t kmer_encoding_table[256];
 	static std::vector<uint64_t> in_genome_bitmap((1ULL << 32) / 64, 0);  // Bitmap array with 2^32 bits
+	static std::vector<uint64_t> in_genome_reverse_bitmap((1ULL << 32) / 64, 0);  // Bitmap array with 2^32 bits
 
 	/*
 		The index
@@ -249,13 +250,25 @@ namespace fast_binary_search
 #endif
 
 	/*
+		IN_GENOME_HEAD()
+		----------------
+	*/
+	forceinline bool in_genome_head(uint64_t key)
+		{
+		return in_genome_bitmap[(key >> 8) / 64] & (1ULL << ((key >> 8) % 64));
+		}
+
+	/*
 		IN_GENOME()
 		-----------
 	*/
 	forceinline bool in_genome(uint64_t key)
 		{
-		uint64_t index = key >> 8;
-		return in_genome_bitmap[index / 64] & (1ULL << (index % 64));
+		return
+			(in_genome_bitmap[(key >> 8) / 64] & (1ULL << ((key >> 8) % 64)))
+			&&
+			(in_genome_reverse_bitmap[(key & 0xFFFFFFFF) / 64] & (1ULL << ((key & 0xFFFFFFFF) % 64)))
+			;
 		}
 
     /*
@@ -268,6 +281,9 @@ namespace fast_binary_search
 			{
 			uint64_t index = num >> 8;
 			in_genome_bitmap[index / 64] |= (1ULL << (index % 64));  // Set the respective bit to 1
+
+			index = num & 0xFFFFFFFF;
+			in_genome_reverse_bitmap[index / 64] |= (1ULL << (index % 64));  // Set the respective bit to 1
 			}
 		}
 
@@ -465,7 +481,7 @@ namespace fast_binary_search
 				If the first 16 bases are not in the genome then there is no point in making
 				variants in the last 4 positions (because they can't be in the genone either).
 			*/
-			if ((i > 15) && !in_genome(sequence))
+			if ((i > 15) && !in_genome_head(sequence))
 				return;
 
 			/*
