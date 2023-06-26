@@ -124,6 +124,8 @@ namespace fast_binary_search
 		The number of bases to use as the key to the index.
 	*/
 	constexpr size_t index_width_in_bases = 14;
+	constexpr uint64_t in_genome_reverse_bitmap_width_in_bases = 14;
+	constexpr uint64_t in_genome_reverse_bitmap_mask = (0x1ULL << (in_genome_reverse_bitmap_width_in_bases * 2)) - 1;
 //	constexpr size_t index_width_in_bases = 1;
 	constexpr size_t base_width_in_bits = 2;
 
@@ -132,7 +134,7 @@ namespace fast_binary_search
 	*/
 	static uint64_t kmer_encoding_table[256];
 	static std::vector<uint64_t> in_genome_bitmap((1ULL << 32) / 64, 0);  // Bitmap array with 2^32 bits
-	static std::vector<uint64_t> in_genome_reverse_bitmap((1ULL << 32) / 64, 0);  // Bitmap array with 2^32 bits
+	static std::vector<uint64_t> in_genome_reverse_bitmap((1ULL << (in_genome_reverse_bitmap_width_in_bases * 2)) / 64, 0);  // Bitmap array
 
 	/*
 		The index
@@ -267,7 +269,7 @@ namespace fast_binary_search
 		return
 			(in_genome_bitmap[(key >> 8) / 64] & (1ULL << ((key >> 8) % 64)))
 			&&
-			(in_genome_reverse_bitmap[(key & 0xFFFFFFFF) / 64] & (1ULL << ((key & 0xFFFFFFFF) % 64)))
+			(in_genome_reverse_bitmap[(key & in_genome_reverse_bitmap_mask) / 64] & (1ULL << ((key & in_genome_reverse_bitmap_mask) % 64)))
 			;
 		}
 
@@ -282,7 +284,7 @@ namespace fast_binary_search
 			uint64_t index = num >> 8;
 			in_genome_bitmap[index / 64] |= (1ULL << (index % 64));  // Set the respective bit to 1
 
-			index = num & 0xFFFFFFFF;
+			index = num & in_genome_reverse_bitmap_mask;
 			in_genome_reverse_bitmap[index / 64] |= (1ULL << (index % 64));  // Set the respective bit to 1
 			}
 		}
