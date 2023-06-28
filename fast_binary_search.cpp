@@ -223,6 +223,31 @@ namespace fast_binary_search
 		return sequence;
 		}
 
+	/*
+		REVERSE_COMPLEMENT()
+		--------------------
+		compute the reverse complement of a DNA sequence.  So "CAT" -> "ATG" (when bases == 3)
+	*/
+	uint64_t reverse_complement(uint64_t kmer, size_t bases = 20)
+		{
+		uint64_t result = 0;
+
+		/*
+			Compute the complement (A<->T, C<->G), which is a bit-fit because A=00, T=11, C=01, G=10
+		*/
+		uint64_t complement = ~kmer;
+
+		/*
+			Reverse the order of the bases
+		*/
+		for (uint64_t base = 0; base < bases; base++, complement >>= 2)
+			result = (result << 2) | (complement & 0x03);
+
+		return result;
+		}
+
+
+
 #ifdef USE_AVX512F
 	/*
 		AVX_BINARY_SEARCH()
