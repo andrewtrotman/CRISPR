@@ -60,6 +60,7 @@ const std::string mode_name[] = { "Binary Search", "Binary Search using AVX512",
 size_t TESTSIZE;
 int mode = FAST_BINARY_SEARCH;
 std::string guides_filename = "OryzaSativaGuides.txt";
+size_t thread_count = std::thread::hardware_concurrency();
 
 /*
 	USAGE()
@@ -67,10 +68,11 @@ std::string guides_filename = "OryzaSativaGuides.txt";
 */
 int usage(const char *exename)
 	{
-	std::cout << "Usage:" << exename << "[-b | -h] [-f<filename>]\n";
+	std::cout << "Usage:" << exename << "[-b | -B | -h] [-f<filename>] [-t<threadcount>\n";
 	std::cout << "       -b for binary search [default]\n";
 	std::cout << "       -B for binary search using AVX512 instructions\n";
 	std::cout << "       -h for hamming distance\n";
+	std::cout << "       -t<threads> the number of threads to use when searching [default = corecount (inc hyperthreads)]\n";
 	std::cout << "       -f<filename> use <filename> as the genome\n";
 
 	return 0;
@@ -103,6 +105,13 @@ int main(int argc, const char *argv[])
 					guides_filename = std::string(argv[++arg]);
 				else
 					guides_filename = std::string(argv[arg] + 2);
+				}
+			else if (strncmp(argv[arg], "-t", 2) == 0)
+				{
+				if (strlen(argv[arg]) == 2)
+					thread_count = atol(argv[++arg]);
+				else
+					thread_count = atol(argv[arg] + 2);
 				}
 			else
 				{
@@ -180,8 +189,6 @@ int main(int argc, const char *argv[])
 	/*
 		Allocate the thread pool
 	*/
-	size_t thread_count = std::thread::hardware_concurrency();
-//	thread_count = 1;
 	std::vector<std::thread> threads;
 
 	/*
