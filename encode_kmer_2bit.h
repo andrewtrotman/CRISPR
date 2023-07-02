@@ -45,6 +45,11 @@ class encode_kmer_2bit
 			kmer_encoding_table[(size_t)'G'] = 2;
 			kmer_encoding_table[(size_t)'T'] = 3;
 
+			kmer_encoding_table[(size_t)'a'] = 0;
+			kmer_encoding_table[(size_t)'c'] = 1;
+			kmer_encoding_table[(size_t)'g'] = 2;
+			kmer_encoding_table[(size_t)'t'] = 3;
+
 			kmer_encoding_table[0] = 'A';
 			kmer_encoding_table[1] = 'C';
 			kmer_encoding_table[2] = 'G';
@@ -58,7 +63,7 @@ class encode_kmer_2bit
 		/*!
 			@brief Pack a 20-mer DNA sequence (consisting of just ACGT characters) int a 64-bit integer
 			@param sequence [in] The DNA sequence to pack.
-			@returns The 20-mer packed into 64-bits, 2 bits per base
+			@returns The 20-mer packed into 64-bits
 		*/
 		uint64_t pack_20mer(const char *sequence) const
 			{
