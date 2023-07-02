@@ -28,78 +28,24 @@
 #include <iostream>
 #include <algorithm>
 
+#include "file.h"
+#include "score_mit_local.h"
+#include "encode_kmer_2bit.h"
+#include "encode_kmer_3bit.h"
+
+
 /*
 	Define USE_AVX512F to use the AVX512 binary search - which on old AVX512 machines is slightly slower than using scalar operations
 */
 #undef USE_AVX512F
 
-#ifdef __APPLE__
-        #define forceinline __attribute__((always_inline)) inline
-#elif defined(__GNUC__)
-        #define forceinline __attribute__((always_inline)) inline
-#elif defined(_MSC_VER)
-        #define forceinline __forceinline
-#else
-        #define forceinline inline
-#endif
-
 namespace hamming_distance
 	{
-	/*
-		Fast lookup for encoding encoded kmers
-	*/
-	static uint64_t kmer_encoding_table[256];
-
-	/*
-		PACK20MER()
-		-----------
-	*/
-	forceinline uint64_t pack20mer(const char *sequence)
-		{
-		uint64_t packed = 0;
-
-		for (int pos = 0; pos < 20; pos++)
-			packed = (packed << 3) | kmer_encoding_table[(size_t)sequence[pos]];
-
-		return packed;
-		}
-
-	/*
-		UNPACK20MER()
-		-------------
-	*/
-	forceinline std::string unpack20mer(uint64_t packed_sequence)
-		{
-		std::string sequence;
-		for (int32_t pos = 19; pos >= 0; pos--)
-			{
-			switch ((packed_sequence >> (pos * 3)) & 7)
-				{
-				case 1:
-					sequence += 'A';
-					break;
-				case 2:
-					sequence += 'C';
-					break;
-				case 4:
-					sequence += 'G';
-					break;
-				case 7:
-					sequence += 'T';
-					break;
-				default:
-					sequence += 'N';
-					break;
-				}
-			}
-		return sequence;
-		}
-
 	/*
 		HAMMING_DISTANCE()
 		------------------
 	*/
-	forceinline uint64_t hamming_distance(uint64_t a, uint64_t b)
+	inline uint64_t hamming_distance(uint64_t a, uint64_t b)
 		{
 		return __popcnt64(a ^ b);
 		}
@@ -132,7 +78,6 @@ namespace fast_binary_search
 	/*
 		Fast lookup for encoding encoded kmers
 	*/
-	static uint64_t kmer_encoding_table[256];
 	static std::vector<uint64_t> in_genome_bitmap((1ULL << 32) / 64, 0);  // Bitmap array with 2^32 bits
 	static std::vector<uint64_t> in_genome_reverse_bitmap((1ULL << (in_genome_reverse_bitmap_width_in_bases * 2)) / 64, 0);  // Bitmap array
 
@@ -140,11 +85,6 @@ namespace fast_binary_search
 		The index
 	*/
 	std::vector<const uint64_t *>index;
-
-	/*
-		Prototypes
-	*/
-	std::string unpack20mer(uint64_t packed_sequence);
 
 	/*
 		COMPUTE_INDEX()
@@ -181,79 +121,13 @@ namespace fast_binary_search
 			}
 		}
 
-	/*
-		PACK20MER()
-		-----------
-	*/
-	forceinline uint64_t pack20mer(const char *sequence)
-		{
-		uint64_t packed = 0;
-
-		for (int pos = 0; pos < 20; pos++)
-			packed = (packed << 2) | kmer_encoding_table[(size_t)sequence[pos]];
-
-		return packed;
-		}
-
-	/*
-		UNPACK20MER()
-		-------------
-	*/
-	forceinline std::string unpack20mer(uint64_t packed_sequence)
-		{
-		std::string sequence;
-		for (int32_t pos = 19; pos >= 0; pos--)
-			{
-			switch ((packed_sequence >> (pos * 2)) & 3)
-				{
-				case 0:
-					sequence += 'A';
-					break;
-				case 1:
-					sequence += 'C';
-					break;
-				case 2:
-					sequence += 'G';
-					break;
-				case 3:
-					sequence += 'T';
-					break;
-				}
-			}
-		return sequence;
-		}
-
-	/*
-		REVERSE_COMPLEMENT()
-		--------------------
-		compute the reverse complement of a DNA sequence.  So "CAT" -> "ATG" (when bases == 3)
-	*/
-	uint64_t reverse_complement(uint64_t kmer, size_t bases = 20)
-		{
-		uint64_t result = 0;
-
-		/*
-			Compute the complement (A<->T, C<->G), which is a bit-fit because A=00, T=11, C=01, G=10
-		*/
-		uint64_t complement = ~kmer;
-
-		/*
-			Reverse the order of the bases
-		*/
-		for (uint64_t base = 0; base < bases; base++, complement >>= 2)
-			result = (result << 2) | (complement & 0x03);
-
-		return result;
-		}
-
-
 
 #ifdef USE_AVX512F
 	/*
 		AVX_BINARY_SEARCH()
 		-------------------
 	*/
-	forceinline __m512i avx_binary_search(__m512i lower, __m512i upper, __m512i key)
+	__m512i avx_binary_search(__m512i lower, __m512i upper, __m512i key)
 		{
 		__m512i one = _mm512_set1_epi64(1);
 		lower = _mm512_srli_epi64(lower, 3);					// Convert from pointers to indexes
@@ -280,7 +154,7 @@ namespace fast_binary_search
 		IN_GENOME_HEAD()
 		----------------
 	*/
-	forceinline bool in_genome_head(uint64_t key)
+	bool in_genome_head(uint64_t key)
 		{
 		return in_genome_bitmap[(key >> 8) / 64] & (1ULL << ((key >> 8) % 64));
 		}
@@ -289,7 +163,7 @@ namespace fast_binary_search
 		IN_GENOME()
 		-----------
 	*/
-	forceinline bool in_genome(uint64_t key)
+	bool in_genome(uint64_t key)
 		{
 		return
 			(in_genome_bitmap[(key >> 8) / 64] & (1ULL << ((key >> 8) % 64)))
@@ -302,7 +176,7 @@ namespace fast_binary_search
        BUILD_IN_GENOME_BITMAP()
        ------------------------
      */
-	forceinline void build_in_genome_bitmap(const std::vector<uint64_t> &integers)
+	void build_in_genome_bitmap(const std::vector<uint64_t> &integers)
 		{
 		for (uint64_t num : integers)
 			{
@@ -423,33 +297,7 @@ namespace fast_binary_search
 			}
 		}
 
-	/*
-		READ_ENTIRE_FILE()
-		------------------
-	*/
-	char *read_entire_file(const char *filename)
-		{
-		FILE *fp;
-		struct stat details;
-		char *contents = NULL;
 
-		if ((fp = fopen(filename, "rb")) != NULL)
-			{
-			if (fstat(fileno(fp), &details) == 0)
-				if (details.st_size != 0)
-					if ((contents = (char *)malloc(details.st_size + 1)) != NULL)
-						{
-						if (fread(contents, details.st_size, 1, fp) != 1)
-							{
-							free(contents);
-							contents = NULL;
-							}
-						contents[details.st_size] = '\0';
-						}
-			fclose(fp);
-			}
-	return contents;
-	}
 
 	/*
 		SELECT_PSEUDO_RANDOM_VECTORS()
@@ -521,51 +369,11 @@ namespace fast_binary_search
 		GENERATE_VARIATIONS()
 		---------------------
 	*/
-	void generate_variations(std::string &sequence, std::vector<uint64_t> &variations, int replacements = 0, int position = 0)
-		{
-		generate_variations_binary(pack20mer(sequence.c_str()), variations, replacements, position);
-		}
-
-	/*
-		GENERATE_VARIATIONS()
-		---------------------
-	*/
 	void generate_variations(uint64_t sequence, std::vector<uint64_t> &variations, int replacements = 0, int position = 0)
 		{
 		generate_variations_binary(sequence, variations, replacements, position);
 		}
 }
-
-/*
-	LOAD_GUIDES()
-	-------------
-*/
-template <typename F>
-std::vector<uint64_t> load_guides(const std::string &filename, F pack20mer)
-	{
-	std::vector<uint64_t> packed_guides;
-	char *guide;
-	char *data = fast_binary_search::read_entire_file(filename.c_str());
-	if (data == NULL)
-		{
-		std::cerr << "Error opening guide file: " << filename << std::endl;
-		exit(1);
-		}
-
-	guide = data - 1;
-	do
-		{
-		guide++;
-		packed_guides.push_back(pack20mer(guide));
-		guide = strchr(guide, '\n');
-		}
-	while (guide != NULL && *(guide + 1) != '\0');
-
-	std::sort(packed_guides.begin(), packed_guides.end());
-	free(data);
-
-	return packed_guides;
-	}
 
 /*
 	Allocate space for the final set of results
@@ -629,6 +437,9 @@ int usage(const char *exename)
 */
 int main(int argc, const char *argv[])
 	{
+	encode_kmer_2bit packer_2bit;
+	encode_kmer_3bit packer_3bit;
+
 	auto start_main = std::chrono::steady_clock::now(); // Start timing
 
 	if (argc <= 4)
@@ -659,26 +470,20 @@ int main(int argc, const char *argv[])
 	std::cout << "Processing using: " << mode_name[mode] << "\n";
 	std::cout << "Using file      : " << guides_filename << "\n";
 
-	hamming_distance::kmer_encoding_table[(size_t)'A'] = 1;
-	hamming_distance::kmer_encoding_table[(size_t)'C'] = 2;
-	hamming_distance::kmer_encoding_table[(size_t)'G'] = 4;
-	hamming_distance::kmer_encoding_table[(size_t)'T'] = 7;
-
-	fast_binary_search::kmer_encoding_table[(size_t)'A'] = 0;
-	fast_binary_search::kmer_encoding_table[(size_t)'C'] = 1;
-	fast_binary_search::kmer_encoding_table[(size_t)'G'] = 2;
-	fast_binary_search::kmer_encoding_table[(size_t)'T'] = 3;
-
 	/*
 		Read the guides from the file.
-		NOTE:load_guides() sorts the list after loading and before returning it.
+		NOTE:read_guides() sorts the list after loading and before returning it.
 	*/
 //	std::string guides_filename = "OryzaSativaGuides.txt";
+	auto time_io_start = std::chrono::steady_clock::now(); // Start timing
 	std::vector<uint64_t> packed_genome_guides;
 	if (mode == FAST_BINARY_SEARCH)
-		packed_genome_guides = load_guides(guides_filename, fast_binary_search::pack20mer);
+		packed_genome_guides = read_guides(true, guides_filename, packer_2bit.pack_20mer);
 	else
-		packed_genome_guides = load_guides(guides_filename, hamming_distance::pack20mer);
+		packed_genome_guides = read_guides(true, guides_filename, packer_3bit.pack_20mer);
+	auto time_io_end = std::chrono::steady_clock::now(); // Stop timing
+	auto time_io_durtion = std::chrono::duration_cast<std::chrono::microseconds>(time_io_end - time_io_start).count();
+	std::cout << "Load encode time: " << time_io_durtion / 1000000.001 << " seconds" << '\n';
 
 	/*
 		Generate some samples (sometimes random, and sometimes not, so keep both versions)

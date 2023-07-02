@@ -65,7 +65,7 @@ class encode_kmer_2bit
 			@param sequence [in] The DNA sequence to pack.
 			@returns The 20-mer packed into 64-bits
 		*/
-		uint64_t pack_20mer(const char *sequence) const
+		static uint64_t pack_20mer(const char *sequence)
 			{
 			uint64_t packed = 0;
 
@@ -84,7 +84,7 @@ class encode_kmer_2bit
 			@param packed_sequence [in] The packed 20-mer.
 			@returns The DNA sequence as a 20-character long string.
 		*/
-		std::string unpack_20mer(uint64_t packed_sequence) const
+		static std::string unpack_20mer(uint64_t packed_sequence)
 			{
 			std::string sequence;
 
