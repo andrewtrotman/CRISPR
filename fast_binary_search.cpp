@@ -2,6 +2,12 @@
 	FAST_BINARY_SEARCH.CPP
 	----------------------
 	Copyright (c) 2023 Andrew Trotman
+
+	TO DO
+	TO DO
+	TO DO
+	TO DO
+		Make sure the mmap() can't segfault because it reads past end of buffer
 */
 #include <math.h>
 #include <stdio.h>
