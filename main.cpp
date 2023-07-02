@@ -3,15 +3,17 @@
 	--------
 	Copyright (c) 2023 Andrew Trotman
 */
-
 #include <vector>
 #include <random>
 #include <thread>
 
 #include "file.h"
+#include "finder.h"
 #include "encode_kmer_2bit.h"
 #include "encode_kmer_3bit.h"
+#include "hamming_distance.h"
 #include "fast_binary_search.h"
+#include "fast_binary_search_avx512.h"
 
 /*
 	SELECT_PSEUDO_RANDOM_VECTORS()
@@ -38,7 +40,6 @@ void select_pseudo_random_vectors(std::vector<uint64_t> &selected, const std::ve
 */
 void select_random_vectors(std::vector<uint64_t> &selected, const std::vector<uint64_t> &guides)
 	{
-//		constexpr int seed = 13;
 	constexpr int seed = 17;
 	std::mt19937 random(seed);
 	std::uniform_int_distribution<int> distribution(0, guides.size() - 1);
@@ -54,8 +55,8 @@ std::vector<std::vector<const uint64_t *>> all_positions;
 /*
 	Command line parameters
 */
-enum { FAST_BINARY_SEARCH, HAMMING_DISTANCE };
-const std::string mode_name[] = { "Binary Search", "Hamming Distance" };
+enum { FAST_BINARY_SEARCH, FAST_BINARY_SEARCH_AVX512, HAMMING_DISTANCE };
+const std::string mode_name[] = { "Binary Search", "Binary Search using AVX512", "Hamming Distance" };
 size_t TESTSIZE;
 int mode = FAST_BINARY_SEARCH;
 std::string guides_filename = "OryzaSativaGuides.txt";
@@ -68,6 +69,7 @@ int usage(const char *exename)
 	{
 	std::cout << "Usage:" << exename << "[-b | -h] [-f<filename>]\n";
 	std::cout << "       -b for binary search [default]\n";
+	std::cout << "       -B for binary search using AVX512 instructions\n";
 	std::cout << "       -h for hamming distance\n";
 	std::cout << "       -f<filename> use <filename> as the genome\n";
 
@@ -91,6 +93,8 @@ int main(int argc, const char *argv[])
 			{
 			if (std::string(argv[arg]) == "-b")
 				mode = FAST_BINARY_SEARCH;
+			else if (std::string(argv[arg]) == "-B")
+				mode = FAST_BINARY_SEARCH_AVX512;
 			else if (std::string(argv[arg]) == "-h")
 				mode = HAMMING_DISTANCE;
 			else if (strncmp(argv[arg], "-f", 2) == 0)
@@ -120,7 +124,7 @@ int main(int argc, const char *argv[])
 //	std::string guides_filename = "OryzaSativaGuides.txt";
 	auto time_io_start = std::chrono::steady_clock::now(); // Start timing
 	std::vector<uint64_t> packed_genome_guides;
-	if (mode == FAST_BINARY_SEARCH)
+	if (mode == FAST_BINARY_SEARCH || mode == FAST_BINARY_SEARCH_AVX512)
 		packed_genome_guides = read_guides(guides_filename, packer_2bit.pack_20mer);
 	else
 		packed_genome_guides = read_guides(guides_filename, packer_3bit.pack_20mer);
@@ -153,9 +157,15 @@ int main(int argc, const char *argv[])
 	/*
 		Generate the index over the guides.
 	*/
-	fast_binary_search searcher;
+	finder *searcher;
 	if (mode == FAST_BINARY_SEARCH)
-		searcher.make_index(packed_genome_guides);
+		searcher = new fast_binary_search;
+	else if (mode == FAST_BINARY_SEARCH_AVX512)
+		searcher = new fast_binary_search_avx512;
+	else // if (mode == HAMMING_DISTANCE)
+		searcher = new hamming_distance;
+
+	searcher->make_index(packed_genome_guides);
 
 	/*
 		Start timing.
@@ -186,10 +196,10 @@ int main(int argc, const char *argv[])
 	std::cout << "Launching " << thread_count << " threads\n";
 	for (size_t i = 0; i < thread_count - 1; i++)
 		{
-		threads.push_back(std::thread(&fast_binary_search::process_chunk, std::ref(searcher), start_index, start_index + chunk_size, std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions)));
+		threads.push_back(std::thread(&finder::process_chunk, searcher, start_index, start_index + chunk_size, std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions)));
 		start_index += chunk_size;
 		}
-	threads.push_back(std::thread(&fast_binary_search::process_chunk, std::ref(searcher), start_index, test_guides.size(), std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions)));
+	threads.push_back(std::thread(&finder::process_chunk, searcher, start_index, test_guides.size(), std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions)));
 
 	/*
 		Wait for each thread to terminate
@@ -202,6 +212,9 @@ int main(int argc, const char *argv[])
 	*/
 	auto end2 = std::chrono::steady_clock::now(); // End timing
 	auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2).count();
+
+	delete searcher;
+
 
 	/*
 		Calculate the statistics
