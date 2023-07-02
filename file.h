@@ -43,13 +43,13 @@ class file
 	*/
 	/*!
 		@brief Read a load of 20-mers from disk, encoded one per line (everything after the 20th character on each line is ignored)
-		@param map [in] if true mmap the file, if false then use OS file I/O methods.
 		@param filename [in] The name of the file to read.
 		@param pack_20mer [in] A functor that will pack a read sequence into a 64-bit integer.
+		@param map [in] if true mmap the file, if false then use OS file I/O methods.
 		@returns A sorted vector of the packed sequences once read from disk.
 	*/
 	template <typename PACKER>
-	std::vector<uint64_t> read_guides(bool map, const std::string &filename, PACKER pack_20mer)
+	std::vector<uint64_t> read_guides(const std::string &filename, PACKER pack_20mer, bool map = true)
 		{
 		std::vector<uint64_t> packed_guides;
 		std::string data;
@@ -80,9 +80,9 @@ class file
 			{
 			guide++;
 			packed_guides.push_back(pack_20mer(guide));
-			guide = strchr(guide, '\n');
+			guide = strchr(guide + 20, '\n');
 			}
-		while (guide != NULL && *(guide + 1) != '\0');
+		while (((uint8_t *)guide - (uint8_t *)address_in_memory) < length - 1);
 
 		std::sort(packed_guides.begin(), packed_guides.end());
 

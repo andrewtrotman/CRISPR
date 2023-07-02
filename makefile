@@ -3,8 +3,11 @@ all : fast_binary_search
 CPPFLAGS = -std=c++11 -pthread -O3 -Wall
 CPP = g++
 
-fast_binary_search : fast_binary_search.o score_mit_local.o encode_kmer_2bit.o encode_kmer_3bit.o file.o file_read_only.o
+fast_binary_search : main.o fast_binary_search.o score_mit_local.o encode_kmer_2bit.o encode_kmer_3bit.o file.o file_read_only.o
 	$(CPP) $(CPPFLAGS) $^ -o $@
+
+main.o : main.cpp
+	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 fast_binary_search.o : fast_binary_search.cpp
 	$(CPP) $(CPPFLAGS) -c $< -o $@
