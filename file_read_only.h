@@ -12,9 +12,14 @@
 */
 #include <stdio.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
+
+#ifdef _MSC_VER
+	#include <Windows.h>
+#else
+	#include <unistd.h>
+	#include <sys/mman.h>
+#endif
 
 #include <string>
 
