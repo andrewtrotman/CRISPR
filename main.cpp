@@ -62,6 +62,60 @@ int mode = FAST_BINARY_SEARCH;
 std::string guides_filename = "OryzaSativaGuides.txt";
 size_t thread_count = std::thread::hardware_concurrency();
 
+
+/*
+	READ_GUIDES()
+	-------------
+*/
+/*!
+	@brief Read a load of 20-mers from disk, encoded one per line (everything after the 20th character on each line is ignored)
+	@param filename [in] The name of the file to read.
+	@param pack_20mer [in] A functor that will pack a read sequence into a 64-bit integer.
+	@param map [in] if true mmap the file, if false then use OS file I/O methods.
+	@returns A sorted vector of the packed sequences once read from disk.
+*/
+template <typename PACKER>
+std::vector<uint64_t> read_guides(const std::string &filename, PACKER pack_20mer, bool map = true)
+	{
+	std::vector<uint64_t> packed_guides;
+	std::string data;
+	JASS::file::file_read_only memory_map;
+	char *guide;
+	const uint8_t *address_in_memory;
+	size_t length;
+
+	if (map)
+		{
+		memory_map.open(filename);
+		length = memory_map.read_entire_file(address_in_memory);
+		}
+	else
+		{
+		length = JASS::file::read_entire_file(filename, data);
+		address_in_memory = (const uint8_t *)&data[0];
+		}
+	guide = (char *)address_in_memory - 1;
+
+	if (length == 0)
+		{
+		std::cerr << "Error opening guide file: " << filename << std::endl;
+		exit(1);
+		}
+
+	do
+		{
+		guide++;
+		packed_guides.push_back(pack_20mer(guide));
+		guide = strchr(guide + 20, '\n');
+		}
+	while (((uint8_t *)guide - (uint8_t *)address_in_memory) < length - 1);
+
+	std::sort(packed_guides.begin(), packed_guides.end());
+
+	return packed_guides;
+	}
+
+
 /*
 	USAGE()
 	-------

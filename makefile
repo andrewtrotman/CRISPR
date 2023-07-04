@@ -1,9 +1,9 @@
 all : fast_binary_search
 
-CPPFLAGS = -std=c++11 -pthread -O3 -Wall -march=native 
+CPPFLAGS = -std=c++14 -pthread -O3 -Wall -march=native 
 CPP = g++
 
-fast_binary_search : main.o fast_binary_search.o fast_binary_search_avx512.o score_mit_local.o encode_kmer_2bit.o encode_kmer_3bit.o file.o file_read_only.o
+fast_binary_search : main.o fast_binary_search.o fast_binary_search_avx512.o score_mit_local.o encode_kmer_2bit.o encode_kmer_3bit.o file.o asserts.o 
 	$(CPP) $(CPPFLAGS) $^ -o $@
 
 main.o : main.cpp finder.h hamming_distance.h
@@ -27,7 +27,7 @@ encode_kmer_3bit.o : encode_kmer_3bit.cpp encode_kmer_3bit.h
 file.o : file.cpp file.h file_read_only.h
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
-file_read_only.o : file_read_only.cpp file_read_only.h
+asserts.o : asserts.cpp asserts.h 
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 clean :
