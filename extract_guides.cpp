@@ -46,6 +46,9 @@ void reverse_complement_20mer(uint8_t *into, const uint8_t *from)
 */
 void extract_20mers(JASS::file &into, const std::string sequence_number, const uint8_t *chromosome)
 	{
+	uint8_t flipped[40];
+	char number[40];
+
 	for (const uint8_t *base = chromosome + 21; *base != '\0'; base++)
 		{
 		if (*base == 'G' && *(base + 1) == 'G')
@@ -61,12 +64,12 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 					}
 			if (!failed)
 				{
+//				std::cout.write((const char *)base - 21, 20) <<  "  +  " << sequence_number << " " << base - chromosome - 20 << '\n';
 				into.write((const char *)base - 21, 20);
 				into.write("  +  ", 5);
 				into.write(sequence_number.c_str(), sequence_number.size());
 				into.write(" ", 1);
 
-				char number[40];
 				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 20);
 				*end_of_number = '\n';
 				into.write(number, end_of_number - number + 1);
@@ -86,15 +89,12 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 			if (!failed)
 				{
 //				std::cout << reverse_complement(std::string((const char *)base - 17, 20)) << "  -  " << sequence_number << " " << base - chromosome - 19 << '\n';
-				uint8_t flipped[40];
 				reverse_complement_20mer(&flipped[0], base - 17);
 				into.write(flipped, 20);
-//				into.write(reverse_complement(std::string((const char *)base - 17, 20)).c_str(), 20);
 				into.write("  -  ", 5);
 				into.write(sequence_number.c_str(), sequence_number.size());
 				into.write(" ", 1);
 
-				char number[40];
 				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 19);
 				*end_of_number = '\n';
 				into.write(number, end_of_number - number + 1);
