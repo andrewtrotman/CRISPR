@@ -7,43 +7,44 @@
 
 #include <string>
 #include <iostream>
+#include <charconv>
 
-#include "file_read_only.h"
+#include "file.h"
 
 uint8_t *chromosome = nullptr;
 
-std::string reverse_complement(std::string &&sequence)
+void reverse_complement_20mer(uint8_t *into, const uint8_t *from)
 	{
-	std::string reverseSeq;
-	for (char nucleotide : sequence)
+	into += 19;
+	const uint8_t *end = from + 20;
+	while (from < end)
 		{
-		switch (nucleotide)
+		switch (*from)
 			{
 			case 'A':
-				reverseSeq += 'T';
+				*into-- = 'T';
 				break;
 			case 'T':
-				reverseSeq += 'A';
+				*into-- = 'A';
 				break;
 			case 'C':
-				reverseSeq += 'G';
+				*into-- = 'G';
 				break;
 			case 'G':
-				reverseSeq += 'C';
+				*into-- = 'C';
 				break;
 			default:
-				reverseSeq += nucleotide;
+				*into-- = *from;
 			}
+		from++;
 		}
-	std::reverse(reverseSeq.begin(), reverseSeq.end());
-	return reverseSeq;
 	}
 
 /*
 	EXTRACT_20MERS()
 	----------------
 */
-void extract_20mers(uint64_t sequence_number, const uint8_t *chromosome)
+void extract_20mers(JASS::file &into, const std::string sequence_number, const uint8_t *chromosome)
 	{
 	for (const uint8_t *base = chromosome + 21; *base != '\0'; base++)
 		{
@@ -59,7 +60,17 @@ void extract_20mers(uint64_t sequence_number, const uint8_t *chromosome)
 					break;
 					}
 			if (!failed)
-				std::cout.write((const char *)base - 21, 20) <<  "  +  " << sequence_number << " " << base - chromosome - 20 << '\n';
+				{
+				into.write((const char *)base - 21, 20);
+				into.write("  +  ", 5);
+				into.write(sequence_number.c_str(), sequence_number.size());
+				into.write(" ", 1);
+
+				char number[40];
+				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 20);
+				*end_of_number = '\n';
+				into.write(number, end_of_number - number + 1);
+				}
 			}
 		if (*(base - 20) == 'C' && *(base - 19) == 'C')
 			{
@@ -73,9 +84,22 @@ void extract_20mers(uint64_t sequence_number, const uint8_t *chromosome)
 					break;
 					}
 			if (!failed)
-				std::cout << reverse_complement(std::string((const char *)base - 17, 20)) << "  -  " << sequence_number << " " << base - chromosome - 19 << '\n';
+				{
+//				std::cout << reverse_complement(std::string((const char *)base - 17, 20)) << "  -  " << sequence_number << " " << base - chromosome - 19 << '\n';
+				uint8_t flipped[40];
+				reverse_complement_20mer(&flipped[0], base - 17);
+				into.write(flipped, 20);
+//				into.write(reverse_complement(std::string((const char *)base - 17, 20)).c_str(), 20);
+				into.write("  -  ", 5);
+				into.write(sequence_number.c_str(), sequence_number.size());
+				into.write(" ", 1);
 
-//				std::cout.write((const char *)base - 17, 20) << "  -  " << sequence_number << " " << base - chromosome - 19 << '\n';
+				char number[40];
+				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 19);
+				*end_of_number = '\n';
+				into.write(number, end_of_number - number + 1);
+				}
+
 			}
 		}
 	}
@@ -84,14 +108,17 @@ void extract_20mers(uint64_t sequence_number, const uint8_t *chromosome)
 	PARSE_GENOME()
 	--------------
 */
-void parse_genome(const char *filename)
+void parse_genome(const char *infilename, char *outfilename)
 	{
-	file_read_only genome;
+	JASS::file::file_read_only genome;
+	JASS::file outfile(outfilename, "wb");
+//	outfile.setvbuf(128 * 1024 * 1024);
 
-	size_t size = genome.open(filename);
+
+	size_t size = genome.open(infilename);
 	if (size == 0)
 		{
-		std::cout << "Cannot open file " << filename << "\n";
+		std::cout << "Cannot open file " << infilename << "\n";
 		exit(1);
 		}
 
@@ -102,6 +129,7 @@ void parse_genome(const char *filename)
 	const uint8_t *start = buffer;
 	const uint8_t *end = start;
 	uint64_t sequence_number = 0;
+	std::string sequence_number_as_string;
 	do
 		{
 		/*
@@ -114,6 +142,7 @@ void parse_genome(const char *filename)
 			end++;
 		sequence_number++;
 		std::cout.write((const char *)start, end - start) << '\n';
+		sequence_number_as_string = std::to_string(sequence_number);
 		/*
 			Search for the end of the chromosome
 		*/
@@ -142,9 +171,7 @@ void parse_genome(const char *filename)
 			Now extract all the 20-mers that end GG
 		*/
 		if (to - chromosome > 20)
-			extract_20mers(sequence_number, chromosome);
-
-exit(0);
+			extract_20mers(outfile, sequence_number_as_string, chromosome);
 		}
 	while (end < end_of_file);
 	}
@@ -155,7 +182,7 @@ exit(0);
 */
 int usage(char *exename)
 	{
-	std::cout << "Usage: " << exename << " <fna_fileame>\n";
+	std::cout << "Usage: " << exename << " <fna_fileame> <output_file>\n";
 	return 1;
 	}
 
@@ -165,10 +192,10 @@ int usage(char *exename)
 */
 int main(int argc, char *argv[])
 	{
-	if (argc != 2)
+	if (argc != 3)
 		exit(usage(argv[0]));
 
-	parse_genome(argv[1]);
+	parse_genome(argv[1], argv[2]);
 
 	return 0;
 	}

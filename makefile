@@ -1,7 +1,13 @@
-all : fast_binary_search
+all : fast_binary_search extract_guides
 
-CPPFLAGS = -std=c++14 -pthread -O3 -Wall -march=native 
+CPPFLAGS = -std=c++17 -pthread -O3 -Wall -march=native 
 CPP = g++
+
+extract_guides : extract_guides.o file.o asserts.o
+	$(CPP) $(CPPFLAGS) $^ -o $@
+
+extract_guides.o : extract_guides.cpp file.h
+	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 fast_binary_search : main.o fast_binary_search.o fast_binary_search_avx512.o score_mit_local.o encode_kmer_2bit.o encode_kmer_3bit.o file.o asserts.o 
 	$(CPP) $(CPPFLAGS) $^ -o $@
@@ -24,11 +30,11 @@ encode_kmer_2bit.o : encode_kmer_2bit.cpp encode_kmer_2bit.h
 encode_kmer_3bit.o : encode_kmer_3bit.cpp encode_kmer_3bit.h
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
-file.o : file.cpp file.h file_read_only.h
+file.o : file.cpp file.h
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 asserts.o : asserts.cpp asserts.h 
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 clean :
-	rm fast_binary_search *.o
+	rm fast_binary_search extract_guides *.o
