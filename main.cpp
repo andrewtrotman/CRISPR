@@ -2,6 +2,16 @@
 	MAIN.CPP
 	--------
 	Copyright (c) 2023 Andrew Trotman
+
+	TO DO:
+	TO DO:
+	TO DO:
+	TO DO:
+	TO DO:
+	TO DO:
+	TO DO:
+	TO DO:
+		FAST_BINARY_SEARCH::COMPUTE_INTERSECTION_LIST() return a double and not push onto the list.
 */
 #include <vector>
 #include <random>
@@ -205,7 +215,7 @@ int main(int argc, const char *argv[])
 	std::vector<uint64_t> test_guides;
 	if (true)
 		{
-		TESTSIZE = 1000;
+		TESTSIZE = 10'000;
 		test_guides.resize(TESTSIZE);
 //		select_random_vectors(test_guides, packed_genome_guides);
 		select_pseudo_random_vectors(test_guides, packed_genome_guides);

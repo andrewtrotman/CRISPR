@@ -13,6 +13,7 @@
 	@author Andrew Trotman,  Dimitri Perrin
 	@copyright 2023 Andrew Trotman, Dimitri Perrin
 */
+#include <vector>
 
 /*
 	CLASS SCORE_MIT_LOCAL

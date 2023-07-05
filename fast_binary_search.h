@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "finder.h"
+#include "score_mit_local.h"
 
 /*
 	CLASS FAST_BINARY_SEARCH
@@ -39,6 +40,11 @@ class fast_binary_search : public finder
 		std::vector<uint64_t> in_genome_bitmap; 		 // Bitmap array with 2^32 bits (i.e. 16 bases wide)
 		std::vector<uint64_t> in_genome_reverse_bitmap;  // Bitmap array whose size id dependant on in_genome_reverse_bitmap_width_in_bases
 		std::vector<const uint64_t *>index;
+
+		/*
+			The scoreing mechanism
+		*/
+		score_mit_local scorer;
 
 	protected:
 		/*
@@ -82,7 +88,7 @@ class fast_binary_search : public finder
 			@param key [in] the 20-mers being searched for.
 			@param positions [out] The vector of match locations (pointers).
 		*/
-		void compute_intersection(const uint64_t key, std::vector<const uint64_t *> &positions) const;
+		double compute_intersection(uint64_t guide, uint64_t key, std::vector<const uint64_t *> &positions) const;
 
 		/*
 			FAST_BINARY_SEARCH::COMPUTE_INTERSECTION_LIST()
@@ -169,7 +175,7 @@ class fast_binary_search : public finder
 			-----------------------------------
 		*/
 		/*!
-			@brief THREAD SAFE.  Search the genome for the given guides in test\_guides
+			@brief THREAD SAFE (if answer is not used elsewhere).  Search the genome for the given guides in test\_guides
 			@param start [in] Where in the test_guides to start searching from.
 			@param end [in] Where in the test_guides to start searching to.
 			@param test_guides [in] The list of guides to look for - and we only look for those between start and end.

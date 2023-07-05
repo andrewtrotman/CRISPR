@@ -6,6 +6,7 @@
 #include <math.h>
 
 #include "forceinline.h"
+#include "score_mit_local.h"
 #include "fast_binary_search.h"
 
 /*
@@ -55,34 +56,20 @@ void fast_binary_search::make_index(const std::vector<uint64_t> &integers)
 	FAST_BINARY_SEARCH::COMPUTE_INTERSECTION()
 	------------------------------------------
 */
-inline void fast_binary_search::compute_intersection(const uint64_t key, std::vector<const uint64_t *> &positions) const
+inline double fast_binary_search::compute_intersection(uint64_t guide, uint64_t key, std::vector<const uint64_t *> &positions) const
 	{
-		size_t index_key = key >> ((20 - index_width_in_bases) * base_width_in_bits);
-		size_t mers_to_search = index[index_key + 1] - index[index_key];
-		if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
-			{
-			/*
-				If the length of the list is short then
-				Linear search in an ordered list
-			*/
-			const uint64_t *found;
-			for (found = index[index_key]; *found < key; found++)
-				{
-				/* Nothing */
-				}
-			if (*found == key)
-				positions.push_back(found);
-			}
-		else
-			{
-			/*
-				If the length of the list is long then
-				Binary search in an ordered list
-			*/
-			const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], key);
-			if (*found == key)
-				positions.push_back(found);
-			}
+	const uint64_t *found;
+	size_t index_key = key >> ((20 - index_width_in_bases) * base_width_in_bits);
+	size_t mers_to_search = index[index_key + 1] - index[index_key];
+	if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
+		for (found = index[index_key]; *found < key; found++) {/* Nothing */ }// If the length of the list is short then l inear search in an ordered list
+	else
+		found = std::lower_bound(index[index_key], index[index_key + 1], key); // If the length of the list is long then vinary search in an ordered list
+
+	if (*found == key)
+		return scorer.score(guide, key);			// compute the score of the variant.
+
+	return 0.0;		// no match found so there is no effect on the cumulative score.
 	}
 
 /*
@@ -91,16 +78,23 @@ inline void fast_binary_search::compute_intersection(const uint64_t key, std::ve
 */
 void fast_binary_search::compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<const uint64_t *> &positions) const
 	{
-	positions.push_back(nullptr);				// push the guide before working on the variants
-
+	const uint64_t guide	= *key;
 	const uint64_t *key_end = key + key_length;
-	const uint64_t *current_key = key + 1;
+	double score = 100.0;
+	constexpr double threshold = 0.75;
+	constexpr double threshold_sum = (100.0 / threshold) - 100.0;
 
-	while (current_key < key_end)
+	for (const uint64_t *current_key = key + 1; current_key < key_end; current_key++)
 		{
-		compute_intersection(*current_key, positions);
-		current_key++;
+		score += compute_intersection(guide, *current_key, positions);
+		if (score > threshold_sum)
+			return;
 		}
+
+	/*
+		THIS SHOULD PUSH THE KEY AND THE SCORE - OR JUST RETURN THE SCORE AND HAVE IT WRITTEN TO DISK LATER
+	*/
+	positions.push_back(key);				// Push a pointer to the guide if it passes the threshold test
 	}
 
 /*
