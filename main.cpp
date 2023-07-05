@@ -110,11 +110,15 @@ std::vector<uint64_t> read_guides(const std::string &filename, PACKER pack_20mer
 		}
 	while (((uint8_t *)guide - (uint8_t *)address_in_memory) < length - 1);
 
+	/*
+		Sort and uniq the list
+	*/
 	std::sort(packed_guides.begin(), packed_guides.end());
+	auto new_end = std::unique(packed_guides.begin(), packed_guides.end());
+	packed_guides.resize(std::distance(packed_guides.begin(), new_end));
 
 	return packed_guides;
 	}
-
 
 /*
 	USAGE()

@@ -5,6 +5,7 @@
 */
 #include <math.h>
 
+#include "forceinline.h"
 #include "fast_binary_search.h"
 
 /*
@@ -51,6 +52,40 @@ void fast_binary_search::make_index(const std::vector<uint64_t> &integers)
 	}
 
 /*
+	FAST_BINARY_SEARCH::COMPUTE_INTERSECTION()
+	------------------------------------------
+*/
+inline void fast_binary_search::compute_intersection(const uint64_t key, std::vector<const uint64_t *> &positions) const
+	{
+		size_t index_key = key >> ((20 - index_width_in_bases) * base_width_in_bits);
+		size_t mers_to_search = index[index_key + 1] - index[index_key];
+		if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
+			{
+			/*
+				If the length of the list is short then
+				Linear search in an ordered list
+			*/
+			const uint64_t *found;
+			for (found = index[index_key]; *found < key; found++)
+				{
+				/* Nothing */
+				}
+			if (*found == key)
+				positions.push_back(found);
+			}
+		else
+			{
+			/*
+				If the length of the list is long then
+				Binary search in an ordered list
+			*/
+			const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], key);
+			if (*found == key)
+				positions.push_back(found);
+			}
+	}
+
+/*
 	FAST_BINARY_SEARCH::COMPUTE_INTERSECTION_LIST()
 	-----------------------------------------------
 */
@@ -63,32 +98,7 @@ void fast_binary_search::compute_intersection_list(const uint64_t *key, size_t k
 
 	while (current_key < key_end)
 		{
-		size_t index_key = *current_key >> ((20 - index_width_in_bases) * base_width_in_bits);
-		size_t mers_to_search = index[index_key + 1] - index[index_key];
-		if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
-			{
-			/*
-				If the length of the list is short then
-				Linear search in an ordered list
-			*/
-			const uint64_t *found;
-			for (found = index[index_key]; *found < *current_key; found++)
-				{
-				/* Nothing */
-				}
-			if (*found == *current_key)
-				positions.push_back(found);
-			}
-		else
-			{
-			/*
-				If the length of the list is long then
-				Binary search in an ordered list
-			*/
-			const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
-			if (*found == *current_key)
-				positions.push_back(found);
-			}
+		compute_intersection(*current_key, positions);
 		current_key++;
 		}
 	}

@@ -74,12 +74,23 @@ class fast_binary_search : public finder
 			}
 
 		/*
+			FAST_BINARY_SEARCH::COMPUTE_INTERSECTION()
+			------------------------------------------
+		*/
+		/*!
+			@brief Compute the intersecton between a key and the genome the has already been indexed.
+			@param key [in] the 20-mers being searched for.
+			@param positions [out] The vector of match locations (pointers).
+		*/
+		void compute_intersection(const uint64_t key, std::vector<const uint64_t *> &positions) const;
+
+		/*
 			FAST_BINARY_SEARCH::COMPUTE_INTERSECTION_LIST()
 			-----------------------------------------------
 		*/
 		/*!
 			@brief Compute the intersecton between the keys and the genome the has already been indexed.
-			@param key [in] the list of 20-mers being seaerched for.
+			@param key [in] the list of 20-mers being searched for.
 			@param key_length [in] the number of k-mers encoded in key.
 			@param positions [out] The vector of match locations (pointers).
 		*/
