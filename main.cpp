@@ -239,7 +239,9 @@ int main(int argc, const char *argv[])
 //		searcher = new hamming_distance;
 		}
 
+	std::cout << "Indexing\n";
 	searcher->make_index(packed_genome_guides);
+	std::cout << "Search\n";
 
 	/*
 		Start timing.

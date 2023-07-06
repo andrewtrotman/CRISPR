@@ -191,16 +191,29 @@ class fast_binary_search : public finder
 			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
 			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
 
-//double lowest_score = threshold_sum;
-//uint64_t lowest_scoring_guide = 0;
+//#define BEST_ONLY 1
+
+			#ifdef BEST_ONLY
+				double lowest_score = threshold_sum;
+				uint64_t lowest_scoring_guide = 0;
+			#endif
 
 			for (size_t which = start; which < end; which++)
 				{
 				try
 					{
-					double score = generate_variations(threshold_sum, test_guides[which]);
-					if (score != 0.0)
-						answer.push_back(sequence_score_pair(test_guides[which], score));
+					#ifdef BEST_ONLY
+						double score = generate_variations(lowest_score, test_guides[which]);
+						if (score != 0.0 && score < lowest_score)
+							{
+							lowest_score = score;
+							lowest_scoring_guide = test_guides[which];
+							}
+					#else
+						double score = generate_variations(threshold_sum, test_guides[which]);
+						if (score != 0.0)
+							answer.push_back(sequence_score_pair(test_guides[which], score));
+					#endif
 					}
 				catch (...)
 					{
@@ -209,5 +222,9 @@ class fast_binary_search : public finder
 					*/
 					}
 				}
+			#ifdef BEST_ONLY
+				if (lowest_score != 0.0)
+					answer.push_back(sequence_score_pair(lowest_scoring_guide, lowest_score));
+			#endif
 			}
 	};
