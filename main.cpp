@@ -3,17 +3,17 @@
 	--------
 	Copyright (c) 2023 Andrew Trotman
 */
+#include <limits>
 #include <vector>
 #include <random>
 #include <thread>
+#include <iostream>
 
 #include "file.h"
 #include "finder.h"
 #include "encode_kmer_2bit.h"
 #include "encode_kmer_3bit.h"
-#include "hamming_distance.h"
 #include "fast_binary_search.h"
-#include "fast_binary_search_avx512.h"
 
 /*
 	SELECT_PSEUDO_RANDOM_VECTORS()
@@ -229,9 +229,15 @@ int main(int argc, const char *argv[])
 	if (mode == FAST_BINARY_SEARCH)
 		searcher = new fast_binary_search;
 	else if (mode == FAST_BINARY_SEARCH_AVX512)
-		searcher = new fast_binary_search_avx512;
+		{
+		exit(printf("Under development\n"));
+//		searcher = new fast_binary_search_avx512;
+		}
 	else // if (mode == HAMMING_DISTANCE)
-		searcher = new hamming_distance;
+		{
+		exit(printf("Under development\n"));
+//		searcher = new hamming_distance;
+		}
 
 	searcher->make_index(packed_genome_guides);
 
@@ -243,7 +249,7 @@ int main(int argc, const char *argv[])
 	/*
 		Create space to put the results
 	*/
-	all_positions.resize(test_guides.size());
+	all_positions.resize(thread_count);
 
 	/*
 		Allocate the thread pool
@@ -262,10 +268,10 @@ int main(int argc, const char *argv[])
 	std::cout << "Launching " << thread_count << " threads\n";
 	for (size_t i = 0; i < thread_count - 1; i++)
 		{
-		threads.push_back(std::thread(&finder::process_chunk, searcher, start_index, start_index + chunk_size, std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions)));
+		threads.push_back(std::thread(&finder::process_chunk, searcher, start_index, start_index + chunk_size, std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions[i])));
 		start_index += chunk_size;
 		}
-	threads.push_back(std::thread(&finder::process_chunk, searcher, start_index, test_guides.size(), std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions)));
+	threads.push_back(std::thread(&finder::process_chunk, searcher, start_index, test_guides.size(), std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions[thread_count - 1])));
 
 	/*
 		Wait for each thread to terminate
@@ -281,42 +287,34 @@ int main(int argc, const char *argv[])
 
 	delete searcher;
 
-
 	/*
 		Calculate the statistics
 	*/
-	double sum_matches = 0.0;
-	size_t min_matches = all_positions[0].size() + 1;
-	size_t max_matches = all_positions[0].size() - 1;
-//	size_t total_count = 0;
-	size_t empty_count = 0;
-	for (int i = 0; i < all_positions.size(); i++)
-		{
-		if (all_positions[i].size() == 0)			// some will have been dropped because they are duplicates
-			empty_count++;
-		else
+	uint64_t match_count = 0;
+	double min_score = std::numeric_limits<double>::max();
+	uint64_t best = 0;
+	double max_score = std::numeric_limits<double>::min();
+	for (int i = 0; i < all_positions.size(); i++)					// per thread
+		for (int j = 0; j < all_positions[i].size(); j++)			// per guide (i.e. per guide per thread)
 			{
-			size_t num_matches = all_positions[i].size() - 1;
-			sum_matches += num_matches;
-			if (num_matches > max_matches)
-				max_matches = num_matches;
-			if (num_matches < min_matches)
-				min_matches = num_matches;
-//			if ((min_matches == max_matches) && i > 0)
-//				std::cout << "OOPS! min = " << min_matches << "max = " << max_matches << ", i = " << i << std::endl;
+			match_count++;
+			double score = all_positions[i][j].score;
+			if (score > max_score)
+				max_score = score;
+			if (score < min_score)
+				{
+				min_score = score;
+				best = all_positions[i][j].sequence;
+				}
 			}
-		}
-//	total_count = all_positions.size() - empty_count;
-	double mean_matches = sum_matches / all_positions.size();
 
 	/*
 		Dump the statistics
 	*/
-	std::cout << "Mean number of matches: " << mean_matches << '\n';
-	std::cout << "Minimum matches: " << min_matches << '\n';
-	std::cout << "Maximum matches: " << max_matches << '\n';
-	std::cout << "Number of unique test guides: " << TESTSIZE - empty_count << '\n';
-	std::cout << "Number of test guides with off-targets: " << empty_count << '\n';
+	std::cout << "Number of test guides: " << TESTSIZE << '\n';
+	std::cout << "Number of test guides with matches within 4: " << match_count << '\n';
+	std::cout << "Min score: " << min_score << " " << packer_2bit.unpack_20mer(best) << '\n';
+	std::cout << "Max score: " << max_score << '\n';
 	std::cout << "Mean Execution time (getvar+intersect): " << duration2 / 1000000.001 << " seconds" << '\n';
 	auto end_main = std::chrono::steady_clock::now(); // End timing
 	auto duration_main = std::chrono::duration_cast<std::chrono::microseconds>(end_main - start_main).count();

@@ -9,10 +9,10 @@ extract_guides : extract_guides.o file.o asserts.o
 extract_guides.o : extract_guides.cpp file.h
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
-fast_binary_search : main.o fast_binary_search.o fast_binary_search_avx512.o score_mit_local.o encode_kmer_2bit.o encode_kmer_3bit.o file.o asserts.o
+fast_binary_search : main.o fast_binary_search.o score_mit_local.o encode_kmer_2bit.o encode_kmer_3bit.o file.o asserts.o
 	$(CPP) $(CPPFLAGS) $^ -o $@
 
-main.o : main.cpp finder.h hamming_distance.h
+main.o : main.cpp finder.h
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
 fast_binary_search.o : fast_binary_search.cpp fast_binary_search.h finder.h
