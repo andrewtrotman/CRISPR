@@ -42,9 +42,9 @@
 		FAST_BINARY_SEARCH_AVX512::COMPUTE_INTERSECTION_LIST()
 		------------------------------------------------------
 	*/
-	void fast_binary_search_avx512::avx_compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<const uint64_t *> &positions) const
+	void fast_binary_search_avx512::avx_compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<sequence_score_pair> &positions) const
 		{
-		positions.push_back(nullptr);				// push the guide before working on the variants
+		positions.push_back(sequence_score_pair(*key, 1));				// push the guide before working on the variants
 
 		const uint64_t *key_end = key + key_length;
 		const uint64_t *current_key = key + 1;
@@ -90,21 +90,21 @@
 				switch(__popcnt16(found_masks))
 					{
 					case 8:
-						positions.push_back(position[7]);			// FALL THROUGH
+						positions.push_back(sequence_score_pair(*(uint64_t *)position[7], 1));			// FALL THROUGH
 					case 7:
-						positions.push_back(position[6]);			// FALL THROUGH
+						positions.push_back(sequence_score_pair(*(uint64_t *)position[6], 1));			// FALL THROUGH
 					case 6:
-						positions.push_back(position[5]);			// FALL THROUGH
+						positions.push_back(sequence_score_pair(*(uint64_t *)position[5], 1));			// FALL THROUGH
 					case 5:
-						positions.push_back(position[4]);			// FALL THROUGH
+						positions.push_back(sequence_score_pair(*(uint64_t *)position[4], 1));			// FALL THROUGH
 					case 4:
-						positions.push_back(position[3]);			// FALL THROUGH
+						positions.push_back(sequence_score_pair(*(uint64_t *)position[3], 1));			// FALL THROUGH
 					case 3:
-						positions.push_back(position[2]);			// FALL THROUGH
+						positions.push_back(sequence_score_pair(*(uint64_t *)position[2], 1));			// FALL THROUGH
 					case 2:
-						positions.push_back(position[1]);			// FALL THROUGH
+						positions.push_back(sequence_score_pair(*(uint64_t *)position[1], 1));			// FALL THROUGH
 					case 1:
-						positions.push_back(position[0]);			// FALL THROUGH
+						positions.push_back(sequence_score_pair(*(uint64_t *)position[0], 1));			// FALL THROUGH
 					}
 				}
 			current_key += 8;
@@ -119,7 +119,7 @@
 
 			const uint64_t *found = std::lower_bound(index[index_key], index[index_key + 1], *current_key);
 			if (*found == *current_key)
-				positions.push_back(found);
+				positions.push_back(sequence_score_pair(*found, 1));
 			current_key++;
 			}
 		}
@@ -139,7 +139,7 @@
 		FAST_BINARY_SEARCH_AVX512::AVX_COMPUTE_INTERSECTION_LIST()
 		----------------------------------------------------------
 	*/
-	void fast_binary_search_avx512::avx_compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<const uint64_t *> &positions) const
+	void fast_binary_search_avx512::avx_compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<sequence_score_pair> &positions) const
 		{
 		std::cout << "AVX512 not enabled in this build\n";
 		exit(0);

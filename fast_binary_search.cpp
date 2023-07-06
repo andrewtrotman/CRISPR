@@ -56,7 +56,7 @@ void fast_binary_search::make_index(const std::vector<uint64_t> &integers)
 	FAST_BINARY_SEARCH::COMPUTE_INTERSECTION()
 	------------------------------------------
 */
-inline double fast_binary_search::compute_intersection(uint64_t guide, uint64_t key, std::vector<const uint64_t *> &positions) const
+inline double fast_binary_search::compute_intersection(uint64_t guide, uint64_t key) const
 	{
 	const uint64_t *found;
 	size_t index_key = key >> ((20 - index_width_in_bases) * base_width_in_bits);
@@ -76,25 +76,20 @@ inline double fast_binary_search::compute_intersection(uint64_t guide, uint64_t 
 	FAST_BINARY_SEARCH::COMPUTE_INTERSECTION_LIST()
 	-----------------------------------------------
 */
-void fast_binary_search::compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<const uint64_t *> &positions) const
+double fast_binary_search::compute_intersection_list(double threshold, const uint64_t *key, size_t key_length) const
 	{
 	const uint64_t guide	= *key;
 	const uint64_t *key_end = key + key_length;
-	double score = 100.0;
-	constexpr double threshold = 0.75;
-	constexpr double threshold_sum = (100.0 / threshold) - 100.0;
+	double score = 0.0;
 
 	for (const uint64_t *current_key = key + 1; current_key < key_end; current_key++)
 		{
-		score += compute_intersection(guide, *current_key, positions);
-		if (score > threshold_sum)
-			return;
+		score += compute_intersection(guide, *current_key);
+		if (score > threshold)
+			return 0.0;
 		}
 
-	/*
-		THIS SHOULD PUSH THE KEY AND THE SCORE - OR JUST RETURN THE SCORE AND HAVE IT WRITTEN TO DISK LATER
-	*/
-	positions.push_back(key);				// Push a pointer to the guide if it passes the threshold test
+	return score;
 	}
 
 /*

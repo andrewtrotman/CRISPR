@@ -2,16 +2,6 @@
 	MAIN.CPP
 	--------
 	Copyright (c) 2023 Andrew Trotman
-
-	TO DO:
-	TO DO:
-	TO DO:
-	TO DO:
-	TO DO:
-	TO DO:
-	TO DO:
-	TO DO:
-		FAST_BINARY_SEARCH::COMPUTE_INTERSECTION_LIST() return a double and not push onto the list.
 */
 #include <vector>
 #include <random>
@@ -57,10 +47,11 @@ void select_random_vectors(std::vector<uint64_t> &selected, const std::vector<ui
 	for (size_t which = 0; which < selected.size(); which++)
 		selected[which] = guides[distribution(random)];
 	}
+
 /*
 	Allocate space for the final set of results
 */
-std::vector<std::vector<const uint64_t *>> all_positions;
+std::vector<std::vector<sequence_score_pair>> all_positions;
 
 /*
 	Command line parameters
@@ -206,8 +197,8 @@ int main(int argc, const char *argv[])
 	else
 		packed_genome_guides = read_guides(guides_filename, packer_3bit.pack_20mer);
 	auto time_io_end = std::chrono::steady_clock::now(); // Stop timing
-	auto time_io_durtion = std::chrono::duration_cast<std::chrono::microseconds>(time_io_end - time_io_start).count();
-	std::cout << "Load encode time: " << time_io_durtion / 1000000.001 << " seconds" << '\n';
+	auto time_io_duration = std::chrono::duration_cast<std::chrono::microseconds>(time_io_end - time_io_start).count();
+	std::cout << "Load encode time: " << time_io_duration / 1000000.001 << " seconds" << '\n';
 
 	/*
 		Generate some samples (sometimes random, and sometimes not, so keep both versions)

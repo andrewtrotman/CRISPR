@@ -51,13 +51,13 @@ class hamming_distance : public finder
 			@param data\_length [in] The numner of k-mers in the genome being looked in.
 			@param positions [out] The result set.
 		*/
-		void compute_hamming_set(uint64_t twice_the_max_distance, uint64_t key, const uint64_t *data, size_t data_length, std::vector<const uint64_t *> &positions)
+		void compute_hamming_set(uint64_t twice_the_max_distance, uint64_t key, const uint64_t *data, size_t data_length, std::vector<sequence_score_pair> &positions)
 			{
 			const uint64_t *end = data + data_length;
 
 			for (const uint64_t *which = data; which < end; which++)
 				if (distance(key, *which) <= twice_the_max_distance)
-					positions.push_back(which);
+					positions.push_back(sequence_score_pair(*which, 1));
 			}
 
 	public:
@@ -96,7 +96,7 @@ class hamming_distance : public finder
 			@param packed_genome_guides [in] The genome to look in.
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<std::vector<const uint64_t *>> &answer)
+		virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<std::vector<sequence_score_pair>> &answer)
 			{
 			std::vector<uint64_t> variations;
 

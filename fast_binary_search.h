@@ -88,7 +88,7 @@ class fast_binary_search : public finder
 			@param key [in] the 20-mers being searched for.
 			@param positions [out] The vector of match locations (pointers).
 		*/
-		double compute_intersection(uint64_t guide, uint64_t key, std::vector<const uint64_t *> &positions) const;
+		double compute_intersection(uint64_t guide, uint64_t key) const;
 
 		/*
 			FAST_BINARY_SEARCH::COMPUTE_INTERSECTION_LIST()
@@ -100,7 +100,7 @@ class fast_binary_search : public finder
 			@param key_length [in] the number of k-mers encoded in key.
 			@param positions [out] The vector of match locations (pointers).
 		*/
-		void compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<const uint64_t *> &positions) const;
+		double compute_intersection_list(double threshold, const uint64_t *key, size_t key_length) const;
 
 		/*
 			FAST_BINARY_SEARCH::GENERATE_VARIATIONS()
@@ -182,15 +182,19 @@ class fast_binary_search : public finder
 			@param packed_genome_guides [in] The genome to look in.
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<std::vector<const uint64_t *>> &answer)
+		virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<std::vector<sequence_score_pair>> &answer)
 			{
 			std::vector<uint64_t> variations;
+			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
+			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
 
 			for (size_t which = start; which < end; which++)
 				{
 				variations.clear();
 				generate_variations(test_guides[which], variations);
-				compute_intersection_list(variations.data(), variations.size(), answer[which]);
+				double score = compute_intersection_list(threshold_sum, variations.data(), variations.size());
+				if (score != 0.0)
+					answer[which].push_back(sequence_score_pair(test_guides[which], score));
 				}
 			}
 	};

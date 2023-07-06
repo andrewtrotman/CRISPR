@@ -55,7 +55,7 @@ class fast_binary_search_avx512 : public fast_binary_search
 			@param key_length [in] the number of k-mers encoded in key.
 			@param positions [out] The vector of match locations (pointers).
 		*/
-		void avx_compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<const uint64_t *> &positions) const;
+		void avx_compute_intersection_list(const uint64_t *key, size_t key_length, std::vector<sequence_score_pair> &positions) const;
 
 	public:
 		/*
@@ -85,30 +85,28 @@ class fast_binary_search_avx512 : public fast_binary_search
 			/* Nothing */
 			}
 
-
-
-	/*
-		FAST_BINARY_SEARCH::PROCESS_CHUNK()
-		-----------------------------------
-	*/
-	/*!
-		@brief THREAD SAFE.  Search the genome for the given guides in test\_guides
-		@param start [in] Where in the test_guides to start searching from.
-		@param end [in] Where in the test_guides to start searching to.
-		@param test_guides [in] The list of guides to look for - and we only look for those between start and end.
-		@param packed_genome_guides [in] The genome to look in.
-		@param answer [out] The result set
-	*/
-	virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<std::vector<const uint64_t *>> &answer)
-		{
-		std::vector<uint64_t> variations;
-
-		for (size_t which = start; which < end; which++)
+		/*
+			FAST_BINARY_SEARCH::PROCESS_CHUNK()
+			-----------------------------------
+		*/
+		/*!
+			@brief THREAD SAFE.  Search the genome for the given guides in test\_guides
+			@param start [in] Where in the test_guides to start searching from.
+			@param end [in] Where in the test_guides to start searching to.
+			@param test_guides [in] The list of guides to look for - and we only look for those between start and end.
+			@param packed_genome_guides [in] The genome to look in.
+			@param answer [out] The result set
+		*/
+		virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<std::vector<sequence_score_pair>> &answer)
 			{
-			variations.clear();
-			generate_variations(test_guides[which], variations);
-			avx_compute_intersection_list(variations.data(), variations.size(), answer[which]);
+			std::vector<uint64_t> variations;
+
+			for (size_t which = start; which < end; which++)
+				{
+				variations.clear();
+				generate_variations(test_guides[which], variations);
+				avx_compute_intersection_list(variations.data(), variations.size(), answer[which]);
+				}
 			}
-		}
 	};
 
