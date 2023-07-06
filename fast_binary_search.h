@@ -108,12 +108,14 @@ class fast_binary_search : public finder
 		*/
 		/*!
 			@brief Generate all 20-mers that are 0 to 4 base mutations away from sequence (and also "likely" to be in the genome begine searched)
+			@param threshold [in] early termination threshold.
+			@param guide [in] the guide that all the variants are made from.
 			@param sequence [in] The sequence being mutated.
-			@param variations [out] The vector of variations.
 			@param replacements [in] The number of mutations that have already been applied to the sequence.
 			@param position [in] The position to start mautating from
+			@returns The score of the sequence
 		*/
-		void generate_variations(uint64_t sequence, std::vector<uint64_t> &variations, int replacements, int position) const;
+		double generate_variations(double threshold, uint64_t guide, uint64_t sequence, int replacements, int position) const;
 
 		/*
 			FAST_BINARY_SEARCH::GENERATE_VARIATIONS()
@@ -121,12 +123,14 @@ class fast_binary_search : public finder
 		*/
 		/*!
 			@brief Generate all 20-mers that are 0 to 4 base mutations away from sequence (and also "likely" to be in the genome begine searched)
+			@param threshold [in] early termination threshold.
 			@param sequence [in] The sequence being mutated.
 			@param variations [out] The vector of variations.
+			@returns The score of the sequence
 		*/
-		void generate_variations(uint64_t sequence, std::vector<uint64_t> &variations) const
+		double generate_variations(double threshold, uint64_t sequence) const
 			{
-			generate_variations(sequence, variations, 0, 0);
+			return generate_variations(threshold, sequence, sequence, 0, 0);
 			}
 
 	public:
@@ -184,17 +188,23 @@ class fast_binary_search : public finder
 		*/
 		virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<std::vector<sequence_score_pair>> &answer)
 			{
-			std::vector<uint64_t> variations;
 			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
 			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
 
 			for (size_t which = start; which < end; which++)
 				{
-				variations.clear();
-				generate_variations(test_guides[which], variations);
-				double score = compute_intersection_list(threshold_sum, variations.data(), variations.size());
-				if (score != 0.0)
-					answer[which].push_back(sequence_score_pair(test_guides[which], score));
+				try
+					{
+					double score = generate_variations(threshold_sum, test_guides[which]);
+					if (score != 0.0)
+						answer[which].push_back(sequence_score_pair(test_guides[which], score));
+					}
+				catch (...)
+					{
+					/*
+						Nothing (move on to the next guide).
+					*/
+					}
 				}
 			}
 	};

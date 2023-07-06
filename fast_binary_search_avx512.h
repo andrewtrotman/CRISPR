@@ -103,9 +103,11 @@ class fast_binary_search_avx512 : public fast_binary_search
 
 			for (size_t which = start; which < end; which++)
 				{
+/*
 				variations.clear();
 				generate_variations(test_guides[which], variations);
 				avx_compute_intersection_list(variations.data(), variations.size(), answer[which]);
+*/
 				}
 			}
 	};

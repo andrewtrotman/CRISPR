@@ -96,13 +96,15 @@ double fast_binary_search::compute_intersection_list(double threshold, const uin
 	FAST_BINARY_SEARCH::GENERATE_VARIATIONS()
 	-----------------------------------------
 */
-void fast_binary_search::generate_variations(uint64_t sequence, std::vector<uint64_t> &variations, int replacements, int position) const
+double fast_binary_search::generate_variations(double threshold, uint64_t guide, uint64_t sequence, int replacements, int position) const
 	{
+	double score = 0;
+
 	if (in_genome(sequence))
-		variations.push_back(sequence);
-		
+		score = compute_intersection(guide, sequence);
+
 	if (replacements == 4)
-		return;
+		return score;
 
 	for (uint64_t i = position; i < 20; i++)
 		{
@@ -111,7 +113,7 @@ void fast_binary_search::generate_variations(uint64_t sequence, std::vector<uint
 			variants in the last 4 positions (because they can't be in the genone either).
 		*/
 		if (i == 16 && !in_genome_head(sequence))
-			return;
+			return score;
 
 		/*
 			This optimisation is from Timothy Chappell who points out that by XORing the
@@ -120,8 +122,16 @@ void fast_binary_search::generate_variations(uint64_t sequence, std::vector<uint
 			mask and replace, we simply XOR with the original sequence and call outselves recursively.
 		*/
 		uint64_t shifter = (19 - i) * 2;
-		generate_variations(sequence ^ (1ULL << shifter), variations, replacements + 1, i + 1);
-		generate_variations(sequence ^ (2ULL << shifter), variations, replacements + 1, i + 1);
-		generate_variations(sequence ^ (3ULL << shifter), variations, replacements + 1, i + 1);
+		score += generate_variations(threshold, guide, sequence ^ (1ULL << shifter), replacements + 1, i + 1);
+		if (score > threshold)
+			throw 1;
+		score += generate_variations(threshold, guide, sequence ^ (2ULL << shifter), replacements + 1, i + 1);
+		if (score > threshold)
+			throw 1;
+		score += generate_variations(threshold, guide, sequence ^ (3ULL << shifter), replacements + 1, i + 1);
+		if (score > threshold)
+			throw 1;
 		}
+
+	return score;
 	}
