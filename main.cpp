@@ -61,6 +61,7 @@ const std::string mode_name[] = { "Binary Search", "Binary Search using AVX512",
 size_t TESTSIZE;
 int mode = FAST_BINARY_SEARCH;
 std::string guides_filename = "OryzaSativaGuides.txt";
+const char *output_filename = nullptr;
 size_t thread_count = std::thread::hardware_concurrency();
 
 
@@ -127,12 +128,13 @@ std::vector<uint64_t> read_guides(const std::string &filename, PACKER pack_20mer
 */
 int usage(const char *exename)
 	{
-	std::cout << "Usage:" << exename << "[-b | -B | -h] [-f<filename>] [-t<threadcount>\n";
+	std::cout << "Usage:" << exename << "[-b | -B | -h] [-f<filename>] [-o<filename>] [-t<threadcount>\n";
 	std::cout << "       -b for binary search [default]\n";
-	std::cout << "       -B for binary search using AVX512 instructions\n";
-	std::cout << "       -h for hamming distance\n";
+//	std::cout << "       -B for binary search using AVX512 instructions\n";
+//	std::cout << "       -h for hamming distance\n";
 	std::cout << "       -t<threads> the number of threads to use when searching [default = corecount (inc hyperthreads)]\n";
 	std::cout << "       -f<filename> use <filename> as the genome\n";
+	std::cout << "       -o<filename> use <filename> as the output file\n";
 
 	return 0;
 	}
@@ -143,6 +145,7 @@ int usage(const char *exename)
 */
 int main(int argc, const char *argv[])
 	{
+	job workload;
 	encode_kmer_2bit packer_2bit;
 	encode_kmer_3bit packer_3bit;
 
@@ -165,6 +168,13 @@ int main(int argc, const char *argv[])
 				else
 					guides_filename = std::string(argv[arg] + 2);
 				}
+			else if (strncmp(argv[arg], "-o", 2) == 0)
+				{
+				if (strlen(argv[arg]) == 2)
+					output_filename = argv[++arg];
+				else
+					output_filename = argv[arg] + 2;
+				}
 			else if (strncmp(argv[arg], "-t", 2) == 0)
 				{
 				if (strlen(argv[arg]) == 2)
@@ -174,7 +184,7 @@ int main(int argc, const char *argv[])
 				}
 			else
 				{
-				std::cout << "unknown paramter:" << argv[arg] << "\n";
+				std::cout << "unknown parameter:" << argv[arg] << "\n";
 				exit(usage(argv[0]));
 				}
 			}
@@ -184,12 +194,20 @@ int main(int argc, const char *argv[])
 
 	std::cout << "Processing using: " << mode_name[mode] << "\n";
 	std::cout << "Using file      : " << guides_filename << "\n";
+	std::cout << "Output file     : " << (output_filename == nullptr ? "<stdout>" : output_filename) << "\n";
+
+	if  (output_filename == nullptr)
+		workload.output_file = stdout;
+	else if ((workload.output_file = fopen(output_filename, "wb")) == nullptr)
+		{
+		std::cout << "Cannot open output file:" << output_filename << "\n";
+		exit(1);
+		}
 
 	/*
 		Read the guides from the file.
 		NOTE:read_guides() sorts the list after loading and before returning it.
 	*/
-//	std::string guides_filename = "OryzaSativaGuides.txt";
 	auto time_io_start = std::chrono::steady_clock::now(); // Start timing
 	std::vector<uint64_t> packed_genome_guides;
 	if (mode == FAST_BINARY_SEARCH || mode == FAST_BINARY_SEARCH_AVX512)
@@ -203,24 +221,23 @@ int main(int argc, const char *argv[])
 	/*
 		Generate some samples (sometimes random, and sometimes not, so keep both versions)
 	*/
-	std::vector<uint64_t> test_guides;
 	if (true)
 		{
 		TESTSIZE = 10'000;
-		test_guides.resize(TESTSIZE);
-//		select_random_vectors(test_guides, packed_genome_guides);
-		select_pseudo_random_vectors(test_guides, packed_genome_guides);
-		sort(test_guides.begin(), test_guides.end());
+		workload.guide.resize(TESTSIZE);
+//		select_random_vectors(workload.guide, packed_genome_guides);
+		select_pseudo_random_vectors(workload.guide, packed_genome_guides);
+		sort(workload.guide.begin(), workload.guide.end());
 		}
 	else
 		{
 		TESTSIZE = packed_genome_guides.size();
-		test_guides.resize(TESTSIZE);
+		workload.guide.resize(TESTSIZE);
 		for (size_t which = 0; which < TESTSIZE; which++)
-			test_guides[which] = packed_genome_guides[which];
+			workload.guide[which] = packed_genome_guides[which];
 		}
 
-	std::cout << "Loaded " << test_guides.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
+	std::cout << "Loaded " << workload.guide.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
 
 	/*
 		Generate the index over the guides.
@@ -259,21 +276,11 @@ int main(int argc, const char *argv[])
 	std::vector<std::thread> threads;
 
 	/*
-		Work out how big each thread-chunk should be
-	*/
-	const size_t chunk_size = test_guides.size() / thread_count;
-	size_t start_index = 0;
-
-	/*
 		Launch each thread
 	*/
 	std::cout << "Launching " << thread_count << " threads\n";
-	for (size_t i = 0; i < thread_count - 1; i++)
-		{
-		threads.push_back(std::thread(&finder::process_chunk, searcher, start_index, start_index + chunk_size, std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions[i])));
-		start_index += chunk_size;
-		}
-	threads.push_back(std::thread(&finder::process_chunk, searcher, start_index, test_guides.size(), std::ref(test_guides), std::ref(packed_genome_guides), std::ref(all_positions[thread_count - 1])));
+	for (size_t i = 0; i < thread_count; i++)
+		threads.push_back(std::thread(&finder::process_chunk, searcher, std::ref(workload), std::ref(packed_genome_guides), std::ref(all_positions[i])));
 
 	/*
 		Wait for each thread to terminate
@@ -290,33 +297,11 @@ int main(int argc, const char *argv[])
 	delete searcher;
 
 	/*
-		Calculate the statistics
-	*/
-	uint64_t match_count = 0;
-	double min_score = std::numeric_limits<double>::max();
-	uint64_t best = 0;
-	double max_score = std::numeric_limits<double>::min();
-	for (int i = 0; i < all_positions.size(); i++)					// per thread
-		for (int j = 0; j < all_positions[i].size(); j++)			// per guide (i.e. per guide per thread)
-			{
-			match_count++;
-			double score = all_positions[i][j].score;
-			if (score > max_score)
-				max_score = score;
-			if (score < min_score)
-				{
-				min_score = score;
-				best = all_positions[i][j].sequence;
-				}
-			}
-
-	/*
 		Dump the statistics
 	*/
 	std::cout << "Number of test guides: " << TESTSIZE << '\n';
-	std::cout << "Number of test guides with matches within 4: " << match_count << '\n';
-	std::cout << "Min score: " << min_score << " " << packer_2bit.unpack_20mer(best) << '\n';
-	std::cout << "Max score: " << max_score << '\n';
+	std::cout << "Number of test guides with matches within 4: " << workload.hits << '\n';
+	std::cout << "Best score: " << workload.best_score << " " << packer_2bit.unpack_20mer(workload.best_20mer) << '\n';
 	std::cout << "Mean Execution time (getvar+intersect): " << duration2 / 1000000.001 << " seconds" << '\n';
 	auto end_main = std::chrono::steady_clock::now(); // End timing
 	auto duration_main = std::chrono::duration_cast<std::chrono::microseconds>(end_main - start_main).count();

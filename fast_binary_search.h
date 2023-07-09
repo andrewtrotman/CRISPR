@@ -15,9 +15,13 @@
 #include <stdint.h>
 
 #include <vector>
+#include <charconv>
+#include <iostream>
 
+#include "job.h"
 #include "finder.h"
 #include "score_mit_local.h"
+#include "encode_kmer_2bit.h"
 
 /*
 	CLASS FAST_BINARY_SEARCH
@@ -186,45 +190,52 @@ class fast_binary_search : public finder
 			@param packed_genome_guides [in] The genome to look in.
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<sequence_score_pair> &answer)
+		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides, std::vector<sequence_score_pair> &answer)
 			{
 			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
 			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
+			char output_buffer[50];
 
-//#define BEST_ONLY 1
+			uint64_t end = workload.guide.size();
+			uint64_t guide_index;
 
-			#ifdef BEST_ONLY
-				double lowest_score = threshold_sum;
-				uint64_t lowest_scoring_guide = 0;
-			#endif
-
-			for (size_t which = start; which < end; which++)
+			while ((guide_index = workload.get_next()) < end)
 				{
+				uint64_t guide = workload.guide[guide_index];
 				try
 					{
-					#ifdef BEST_ONLY
-						double score = generate_variations(lowest_score, test_guides[which]);
-						if (score != 0.0 && score < lowest_score)
+					double score = generate_variations(threshold_sum, guide);
+					if (score != 0.0)
+						{
+						score = 100.0 / (score + 100.0);				// convert to the MIT Global Score
+						encode_kmer_2bit::unpack_20mer(output_buffer, guide);
+						output_buffer[20] = ' ';
+						auto [string_end, error] = std::to_chars(&output_buffer[21], &output_buffer[49], (int)(score * 100.0));
+						*string_end++ = '\n';
+						*string_end = '\0';
+
+						workload.file_mutex.lock();
 							{
-							lowest_score = score;
-							lowest_scoring_guide = test_guides[which];
+							fwrite(output_buffer, sizeof(char), string_end - output_buffer, workload.output_file);
+							if (score > workload.best_score)
+								{
+								workload.best_20mer = guide;
+								workload.best_score = score;
+								}
 							}
-					#else
-						double score = generate_variations(threshold_sum, test_guides[which]);
-						if (score != 0.0)
-							answer.push_back(sequence_score_pair(test_guides[which], score));
-					#endif
+						workload.file_mutex.unlock();
+
+						workload.hits++;
+						}
 					}
 				catch (...)
 					{
 					/*
-						Nothing (move on to the next guide).
+						This happens if the recursion that generates the variants early terminates
+						in which case we do nothing (because there is no work to) other than move
+						on to the next guide in the list.
 					*/
 					}
 				}
-			#ifdef BEST_ONLY
-				if (lowest_score != 0.0)
-					answer.push_back(sequence_score_pair(lowest_scoring_guide, lowest_score));
-			#endif
 			}
 	};

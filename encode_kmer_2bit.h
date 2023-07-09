@@ -81,6 +81,24 @@ class encode_kmer_2bit
 		*/
 		/*!
 			@brief Turn a packed 20-mer into an ASCII representation (ACGT).
+			@param into [out] The unpaced 20-mer (a sequence of ACTG characters, '\0' terminated).
+			@param packed_sequence [in] The packed 20-mer.
+			@returns The DNA sequence as a 20-character long string.
+		*/
+		static void unpack_20mer(char *into, uint64_t packed_sequence)
+			{
+			for (int32_t pos = 19; pos >= 0; pos--)
+				*into++ = kmer_encoding_table[(packed_sequence >> (pos * 2)) & 3];
+
+			*into = '\0';
+			}
+
+		/*
+			ENCODE_KMER_2BIT::UNPACK_20MER()
+			--------------------------------
+		*/
+		/*!
+			@brief Turn a packed 20-mer into an ASCII representation (ACGT).
 			@param packed_sequence [in] The packed 20-mer.
 			@returns The DNA sequence as a 20-character long string.
 		*/
