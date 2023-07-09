@@ -280,7 +280,7 @@ int main(int argc, const char *argv[])
 	*/
 	std::cout << "Launching " << thread_count << " threads\n";
 	for (size_t i = 0; i < thread_count; i++)
-		threads.push_back(std::thread(&finder::process_chunk, searcher, std::ref(workload), std::ref(packed_genome_guides), std::ref(all_positions[i])));
+		threads.push_back(std::thread(&finder::process_chunk, searcher, std::ref(workload), std::ref(packed_genome_guides)));
 
 	/*
 		Wait for each thread to terminate

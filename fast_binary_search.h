@@ -190,7 +190,7 @@ class fast_binary_search : public finder
 			@param packed_genome_guides [in] The genome to look in.
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides, std::vector<sequence_score_pair> &answer)
+		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides)
 			{
 			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
 			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
@@ -207,6 +207,9 @@ class fast_binary_search : public finder
 					double score = generate_variations(threshold_sum, guide);
 					if (score != 0.0)
 						{
+						/*
+							Convert the local score to a global score then write to the output file
+						*/
 						score = 100.0 / (score + 100.0);				// convert to the MIT Global Score
 						encode_kmer_2bit::unpack_20mer(output_buffer, guide);
 						output_buffer[20] = ' ';
@@ -215,17 +218,20 @@ class fast_binary_search : public finder
 						*string_end = '\0';
 
 						workload.file_mutex.lock();
-							{
 							fwrite(output_buffer, sizeof(char), string_end - output_buffer, workload.output_file);
-							if (score > workload.best_score)
-								{
-								workload.best_20mer = guide;
-								workload.best_score = score;
-								}
-							}
 						workload.file_mutex.unlock();
 
+						/*
+							Update the stats
+						*/
 						workload.hits++;
+						if (score > workload.best_score)
+							{
+							workload.stats_mutex.lock();
+								workload.best_20mer = guide;
+								workload.best_score = score;
+							workload.stats_mutex.unlock();
+							}
 						}
 					}
 				catch (...)
