@@ -13,6 +13,8 @@
 	@author Andrew Trotman,  Dimitri Perrin
 	@copyright 2023 Andrew Trotman, Dimitri Perrin
 */
+#include <stdint.h>
+
 #include <vector>
 
 /*

@@ -8,6 +8,7 @@
 #include <random>
 #include <thread>
 #include <iostream>
+#include <algorithm>
 
 #include "file.h"
 #include "finder.h"
