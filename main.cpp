@@ -223,7 +223,7 @@ int main(int argc, const char *argv[])
 	*/
 	if (true)
 		{
-		TESTSIZE = 10'000;
+		TESTSIZE = 10000;
 		workload.guide.resize(TESTSIZE);
 //		select_random_vectors(workload.guide, packed_genome_guides);
 		select_pseudo_random_vectors(workload.guide, packed_genome_guides);

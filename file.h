@@ -119,7 +119,7 @@ namespace JASS
 			size_t file_position;				///< The ftell() position in the file.
 			size_t buffer_size;					///< Size of the internal file buffering.
 			size_t buffer_used;					///< How much of the internal file buffer is being used.
-			std::unique_ptr<uint8_t []> buffer;	///< Internal file buffer
+			uint8_t *buffer;						///< Internal file buffer
 			size_t bytes_written;				///< Number of bytes written to this file.
 			size_t bytes_read;					///< Number of bytes read from this file.
 
@@ -146,7 +146,7 @@ namespace JASS
 				file_position(0),
 				buffer_size(10 * 1024 * 1024),					// start with a buffer of this size
 				buffer_used(0),
-				buffer(std::make_unique<uint8_t []>(buffer_size)),
+				buffer(new uint8_t[buffer_size]),
 				bytes_written(0),
 				bytes_read(0)
 				{
@@ -202,6 +202,7 @@ namespace JASS
 				flush();
 				if (fp != nullptr && fp != stdin && fp != stdout && fp != stderr)
 					fclose(fp);
+				delete [] buffer;
 				}
 
 			/*
@@ -220,7 +221,8 @@ namespace JASS
 			size_t setvbuf(size_t size)
 				{
 				buffer_size = size;
-				buffer = std::make_unique<uint8_t []>(buffer_size);
+				delete [] buffer;
+				buffer = new uint8_t[buffer_size];
 				return buffer == NULL ? 0 : 1;
 				}
 
@@ -240,7 +242,7 @@ namespace JASS
 						done with blocking I/O then this causes a bottleneck as we wait for the OS
 						to write to disk.
 					*/
-					::fwrite(buffer.get(), 1, buffer_used, fp);
+					::fwrite(buffer, 1, buffer_used, fp);
 					buffer_used = 0;
 					}
 				}
@@ -332,7 +334,7 @@ namespace JASS
 					/*
 						The data fits in the internal buffers
 					*/
-					memcpy(buffer.get() + buffer_used, data, (size_t)size);
+					memcpy(buffer + buffer_used, data, (size_t)size);
 					buffer_used += size;
 					}
 				else
@@ -346,7 +348,7 @@ namespace JASS
 						{
 						flush();
 						block_size = size <= buffer_size ? size : buffer_size;
-						memcpy(buffer.get(), from, (size_t)block_size);
+						memcpy(buffer, from, (size_t)block_size);
 						buffer_used += block_size;
 						from += block_size;
 						size -= block_size;

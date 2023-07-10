@@ -1,6 +1,6 @@
 all : fast_binary_search extract_guides
 
-CPPFLAGS = -std=c++14 -pthread -O3 -Wall -march=native 
+CPPFLAGS = -std=c++11 -pthread -O3 -Wall -march=native 
 CXX = g++
 
 extract_guides : extract_guides.o file.o asserts.o
