@@ -219,7 +219,7 @@ class fast_binary_search : public finder
 
 						workload.file_mutex.lock();
 //							fwrite(output_buffer, sizeof(char), string_end - output_buffer, workload.output_file);
-							fwrite(output_buffer, sizeof(char), bytes + 20, workload.output_file);
+							fwrite(output_buffer, sizeof(char), bytes + 21, workload.output_file);
 						workload.file_mutex.unlock();
 
 						/*
