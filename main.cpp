@@ -50,6 +50,55 @@ void select_random_vectors(std::vector<uint64_t> &selected, const std::vector<ui
 	}
 
 /*
+	UNIQ()
+	------
+*/
+/*!
+	@brief Unique (inplace) the data in a vector and return a new vector of frquencies of each unique member
+	@param data [in/out] The data to unique
+	@param frequencies[out] The frequencies of each unique member.
+*/
+void uniq(std::vector<uint64_t> &data, std::vector<uint16_t> &frequencies)
+	{
+	uint64_t was = 0;
+	uint64_t count = 1;
+
+	/*
+		Allocate space for the frequencies
+	*/
+	frequencies.reserve(data.size());
+
+	/*
+		Unique the vector
+	*/
+	size_t index = 1;
+	while (index < data.size())
+		{
+		if (data[index] == data[was])
+			count++;
+		else
+			{
+			was++;
+			data[was] = data[index];
+			frequencies.push_back(count > std::numeric_limits<uint16_t>::max() ? std::numeric_limits<uint16_t>::max() : count);
+			count = 1;
+			}
+		index++;
+		}
+	/*
+		Don't forget the last one
+	*/
+	was++;
+	data[was] = data[index];
+	frequencies.push_back(count);
+
+	/*
+		Resize the data to just the size of the unique list
+	*/
+	data.resize(was);
+	}
+
+/*
 	Allocate space for the final set of results
 */
 std::vector<std::vector<sequence_score_pair>> all_positions;
@@ -66,6 +115,7 @@ const char *output_filename = nullptr;
 size_t thread_count = std::thread::hardware_concurrency();
 
 
+
 /*
 	READ_GUIDES()
 	-------------
@@ -78,7 +128,7 @@ size_t thread_count = std::thread::hardware_concurrency();
 	@returns A sorted vector of the packed sequences once read from disk.
 */
 template <typename PACKER>
-std::vector<uint64_t> read_guides(const std::string &filename, PACKER pack_20mer, bool map = true)
+std::vector<uint64_t> read_guides(std::vector<uint16_t> &frequencies, const std::string &filename, PACKER pack_20mer, bool map = true)
 	{
 	std::vector<uint64_t> packed_guides;
 	std::string data;
@@ -117,8 +167,7 @@ std::vector<uint64_t> read_guides(const std::string &filename, PACKER pack_20mer
 		Sort and uniq the list
 	*/
 	std::sort(packed_guides.begin(), packed_guides.end());
-	auto new_end = std::unique(packed_guides.begin(), packed_guides.end());
-	packed_guides.resize(std::distance(packed_guides.begin(), new_end));
+	uniq(packed_guides, frequencies);
 
 	return packed_guides;
 	}
@@ -211,10 +260,11 @@ int main(int argc, const char *argv[])
 	*/
 	auto time_io_start = std::chrono::steady_clock::now(); // Start timing
 	std::vector<uint64_t> packed_genome_guides;
+	std::vector<uint16_t> packed_genome_guides_frequencies;
 	if (mode == FAST_BINARY_SEARCH || mode == FAST_BINARY_SEARCH_AVX512)
-		packed_genome_guides = read_guides(guides_filename, packer_2bit.pack_20mer);
+		packed_genome_guides = read_guides(packed_genome_guides_frequencies, guides_filename, packer_2bit.pack_20mer);
 	else
-		packed_genome_guides = read_guides(guides_filename, packer_3bit.pack_20mer);
+		packed_genome_guides = read_guides(packed_genome_guides_frequencies, guides_filename, packer_3bit.pack_20mer);
 	auto time_io_end = std::chrono::steady_clock::now(); // Stop timing
 	auto time_io_duration = std::chrono::duration_cast<std::chrono::microseconds>(time_io_end - time_io_start).count();
 	std::cout << "Load encode time: " << time_io_duration / 1000000.001 << " seconds" << '\n';
@@ -281,7 +331,7 @@ int main(int argc, const char *argv[])
 	*/
 	std::cout << "Launching " << thread_count << " threads\n";
 	for (size_t i = 0; i < thread_count; i++)
-		threads.push_back(std::thread(&finder::process_chunk, searcher, std::ref(workload), std::ref(packed_genome_guides)));
+		threads.push_back(std::thread(&finder::process_chunk, searcher, std::ref(workload), std::ref(packed_genome_guides), std::ref(packed_genome_guides_frequencies)));
 
 	/*
 		Wait for each thread to terminate

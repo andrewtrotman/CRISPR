@@ -59,5 +59,5 @@ class finder
 			@param packed_genome_guides [in] The genome to look in.
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides) = 0;
+		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides, std::vector<uint16_t> &frequencies) = 0;
 	};

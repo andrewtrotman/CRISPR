@@ -189,7 +189,7 @@ class fast_binary_search : public finder
 			@param packed_genome_guides [in] The genome to look in.
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides)
+		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides, std::vector<uint16_t> &frequencies)
 			{
 			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
 			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
@@ -201,6 +201,8 @@ class fast_binary_search : public finder
 			while ((guide_index = workload.get_next()) < end)
 				{
 				uint64_t guide = workload.guide[guide_index];
+				if (frequencies[guide_index] != 1)
+					continue;
 				try
 					{
 					double score = generate_variations(threshold_sum, guide);

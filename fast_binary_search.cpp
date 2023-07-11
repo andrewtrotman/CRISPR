@@ -62,12 +62,16 @@ inline double fast_binary_search::compute_intersection(uint64_t guide, uint64_t 
 	size_t index_key = key >> ((20 - index_width_in_bases) * base_width_in_bits);
 	size_t mers_to_search = index[index_key + 1] - index[index_key];
 	if (mers_to_search < 13)				// On my Mac, 13 was the cross-over point between binary and linear search
-		for (found = index[index_key]; *found < key; found++) {/* Nothing */ }// If the length of the list is short then l inear search in an ordered list
+		for (found = index[index_key]; *found < key; found++) {/* Nothing */ }// If the length of the list is short then linear search in an ordered list
 	else
-		found = std::lower_bound(index[index_key], index[index_key + 1], key); // If the length of the list is long then vinary search in an ordered list
+		found = std::lower_bound(index[index_key], index[index_key + 1], key); // If the length of the list is long then binary search in an ordered list
 
 	if (*found == key)
-		return scorer.score(guide, key);			// compute the score of the variant.
+		{
+		double frequency = 1;
+		//
+		return scorer.score(guide, key) * frequency;			// compute the score of the variant.
+		}
 
 	return 0.0;		// no match found so there is no effect on the cumulative score.
 	}
