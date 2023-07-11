@@ -68,7 +68,7 @@ inline double fast_binary_search::compute_intersection(uint64_t guide, uint64_t 
 
 	if (*found == key)
 		{
-		double frequency = 1;
+		double frequency = 1.0;
 		//
 		return scorer.score(guide, key) * frequency;			// compute the score of the variant.
 		}

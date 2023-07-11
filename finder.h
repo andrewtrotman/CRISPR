@@ -53,11 +53,8 @@ class finder
 		*/
 		/*!
 			@brief THREAD SAFE.  Search the genome for the given guides in test\_guides
-			@param start [in] Where in the test_guides to start searching from.
-			@param end [in] Where in the test_guides to start searching to.
-			@param test_guides [in] The list of guides to look for - and we only look for those between start and end.
-			@param packed_genome_guides [in] The genome to look in.
+			@param workload [in] the queries, data, and frequencies
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides, std::vector<uint16_t> &frequencies) = 0;
+		virtual void process_chunk(job &workload) = 0;
 	};

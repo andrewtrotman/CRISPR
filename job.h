@@ -24,16 +24,19 @@
 class job
 	{
 	public:
-		std::atomic<uint64_t> current;			// which guide is next to be processed (starts from 0)
-		std::vector<uint64_t> guide;			// the vector of guides to perform work on
+		std::atomic<uint64_t> current;						// which guide is next to be processed (starts from 0)
+		std::vector<uint64_t> guide;							// the vector of guides to perform work on (the things we are looking for)
 
-		std::mutex file_mutex;					// mutex that controls the file output critical section
-		FILE *output_file;						// the FILE handle to the output file (that should be accessed controlled using file_mutex)
+		std::vector<uint64_t> genome_guides;				// Where we are looking into
+		std::vector<uint16_t> genome_guide_frequencies;	// the number of times each guide appears in the genome
 
-		std::mutex stats_mutex;					// mutex that controls the stats (listed here below)
-		std::atomic<uint64_t> hits;				// the number of 20-mers that have at least one match
-		std::atomic<uint64_t> best_20mer;		// the 20-mer with the highest score so far
-		std::atomic<double> best_score;			// the score of the best 20-mer so far
+		std::mutex file_mutex;									// mutex that controls the file output critical section
+		FILE *output_file;										// the FILE handle to the output file (that should be accessed controlled using file_mutex)
+
+		std::mutex stats_mutex;									// mutex that controls the stats (listed here below)
+		std::atomic<uint64_t> hits;							// the number of 20-mers that have at least one match
+		std::atomic<uint64_t> best_20mer;					// the 20-mer with the highest score so far
+		std::atomic<double> best_score;						// the score of the best 20-mer so far
 
 	public:
 		/*

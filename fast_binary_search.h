@@ -186,10 +186,9 @@ class fast_binary_search : public finder
 			@param start [in] Where in the test_guides to start searching from.
 			@param end [in] Where in the test_guides to start searching to.
 			@param test_guides [in] The list of guides to look for - and we only look for those between start and end.
-			@param packed_genome_guides [in] The genome to look in.
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(job &workload, std::vector<uint64_t> &packed_genome_guides, std::vector<uint16_t> &frequencies)
+		virtual void process_chunk(job &workload)
 			{
 			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
 			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
@@ -201,7 +200,7 @@ class fast_binary_search : public finder
 			while ((guide_index = workload.get_next()) < end)
 				{
 				uint64_t guide = workload.guide[guide_index];
-				if (frequencies[guide_index] != 1)
+				if (workload.genome_guide_frequencies[guide_index] != 1)
 					continue;
 				try
 					{

@@ -259,12 +259,10 @@ int main(int argc, const char *argv[])
 		NOTE:read_guides() sorts the list after loading and before returning it.
 	*/
 	auto time_io_start = std::chrono::steady_clock::now(); // Start timing
-	std::vector<uint64_t> packed_genome_guides;
-	std::vector<uint16_t> packed_genome_guides_frequencies;
 	if (mode == FAST_BINARY_SEARCH || mode == FAST_BINARY_SEARCH_AVX512)
-		packed_genome_guides = read_guides(packed_genome_guides_frequencies, guides_filename, packer_2bit.pack_20mer);
+		workload.genome_guides = read_guides(workload.genome_guide_frequencies, guides_filename, packer_2bit.pack_20mer);
 	else
-		packed_genome_guides = read_guides(packed_genome_guides_frequencies, guides_filename, packer_3bit.pack_20mer);
+		workload.genome_guides = read_guides(workload.genome_guide_frequencies, guides_filename, packer_3bit.pack_20mer);
 	auto time_io_end = std::chrono::steady_clock::now(); // Stop timing
 	auto time_io_duration = std::chrono::duration_cast<std::chrono::microseconds>(time_io_end - time_io_start).count();
 	std::cout << "Load encode time: " << time_io_duration / 1000000.001 << " seconds" << '\n';
@@ -276,19 +274,19 @@ int main(int argc, const char *argv[])
 		{
 		TESTSIZE = 10000;
 		workload.guide.resize(TESTSIZE);
-//		select_random_vectors(workload.guide, packed_genome_guides);
-		select_pseudo_random_vectors(workload.guide, packed_genome_guides);
+//		select_random_vectors(workload.guide, workload.genome_guides);
+		select_pseudo_random_vectors(workload.guide, workload.genome_guides);
 		sort(workload.guide.begin(), workload.guide.end());
 		}
 	else
 		{
-		TESTSIZE = packed_genome_guides.size();
+		TESTSIZE = workload.genome_guides.size();
 		workload.guide.resize(TESTSIZE);
 		for (size_t which = 0; which < TESTSIZE; which++)
-			workload.guide[which] = packed_genome_guides[which];
+			workload.guide[which] = workload.genome_guides[which];
 		}
 
-	std::cout << "Loaded " << workload.guide.size() << " test guides, " <<  packed_genome_guides.size() << " genome guides" << '\n';
+	std::cout << "Loaded " << workload.guide.size() << " test guides, " <<  workload.genome_guides.size() << " genome guides" << '\n';
 
 	/*
 		Generate the index over the guides.
@@ -308,7 +306,7 @@ int main(int argc, const char *argv[])
 		}
 
 	std::cout << "Indexing\n";
-	searcher->make_index(packed_genome_guides);
+	searcher->make_index(workload.genome_guides);
 	std::cout << "Search\n";
 
 	/*
@@ -331,7 +329,7 @@ int main(int argc, const char *argv[])
 	*/
 	std::cout << "Launching " << thread_count << " threads\n";
 	for (size_t i = 0; i < thread_count; i++)
-		threads.push_back(std::thread(&finder::process_chunk, searcher, std::ref(workload), std::ref(packed_genome_guides), std::ref(packed_genome_guides_frequencies)));
+		threads.push_back(std::thread(&finder::process_chunk, searcher, std::ref(workload)));
 
 	/*
 		Wait for each thread to terminate
