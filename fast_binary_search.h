@@ -33,7 +33,7 @@ class fast_binary_search : public finder
 	{
 	protected:
 		static constexpr size_t index_width_in_bases = 14;			// bases to use as the key in the index
-		static constexpr uint64_t in_genome_reverse_bitmap_width_in_bases = 17;
+		static constexpr uint64_t in_genome_reverse_bitmap_width_in_bases = 14;
 		static constexpr uint64_t in_genome_reverse_bitmap_mask = (0x1ULL << (in_genome_reverse_bitmap_width_in_bases * 2)) - 1;
 		static constexpr size_t base_width_in_bits = 2;			// must be 2 (2 bits per base in the uint64_t encoding)
 
