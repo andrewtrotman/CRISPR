@@ -205,9 +205,9 @@ class fast_binary_search : public finder
 
 			while ((guide_index = workload.get_next()) < end)
 				{
-				uint64_t guide = workload.guide[guide_index];
 				if (workload.genome_guide_frequencies[guide_index] != 1)
 					continue;
+				uint64_t guide = workload.guide[guide_index];
 				try
 					{
 					double score = generate_variations(threshold_sum, guide);
