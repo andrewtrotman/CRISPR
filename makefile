@@ -1,4 +1,5 @@
-all : fast_binary_search extract_guides
+#all : fast_binary_search extract_guides
+all : fast_binary_search
 
 CPPFLAGS = -std=c++11 -pthread -O3 -Wall -march=native 
 CXX = g++
