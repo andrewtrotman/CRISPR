@@ -49,6 +49,11 @@ class fast_binary_search : public finder
 		*/
 		score_mit_local scorer;
 
+		/*
+			The current work task
+		*/
+		job *workload;
+
 	protected:
 		/*
 			FAST_BINARY_SEARCH::IN_GENOME_HEAD()
@@ -194,6 +199,7 @@ class fast_binary_search : public finder
 			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
 			char output_buffer[50];
 
+			this->workload = &workload;
 			uint64_t end = workload.guide.size();
 			uint64_t guide_index;
 
