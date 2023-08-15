@@ -187,10 +187,8 @@ class fast_binary_search : public finder
 			-----------------------------------
 		*/
 		/*!
-			@brief THREAD SAFE (if answer is not used elsewhere).  Search the genome for the given guides in test\_guides
-			@param start [in] Where in the test_guides to start searching from.
-			@param end [in] Where in the test_guides to start searching to.
-			@param test_guides [in] The list of guides to look for - and we only look for those between start and end.
+			@brief THREAD SAFE.  Search the genome for the given guides in test\_guides
+			@param workload [in] the queries, data, and frequencies
 			@param answer [out] The result set
 		*/
 		virtual void process_chunk(job &workload)
@@ -205,7 +203,7 @@ class fast_binary_search : public finder
 
 			while ((guide_index = workload.get_next()) < end)
 				{
-				if (workload.genome_guide_frequencies[guide_index] != 1)
+				if (workload.guide_frequencies[guide_index] != 1)
 					continue;
 				uint64_t guide = workload.guide[guide_index];
 				try

@@ -3,13 +3,16 @@
 	------------------
 	Copyright (c) 2023 Andrew Trotman
 */
-#pragma once
 /*!
 	@file
 	@brief The hamming distance method of finding variants of k-mers in a genome.
 	@author Andrew Trotman
 	@copyright 2023 Andrew Trotman
 */
+#pragma once
+
+#include "score_mit_local.h"
+
 #if defined(__APPLE__) || defined(__linux__)
 	#define __popcnt64 __builtin_popcountll
 #endif
@@ -23,6 +26,9 @@
 */
 class hamming_distance : public finder
 	{
+	private:
+		score_mit_local scorer;
+
 	private:
 		/*
 			HAMMING_DISTANCE::DISTANCE()
@@ -45,19 +51,27 @@ class hamming_distance : public finder
 		*/
 		/*!
 			@brief Run through the genome looking for matches.
+			@param threshold [in] early termination threshold.
 			@param twice_the_max_distance [in] Twice the hamming distance looked for (will find all matches where the hamming distance <= twice\_the\_max\_distance / 2).
 			@param key [in] The kmer to look for.
-			@param data [in] The genome to look in.
-			@param data\_length [in] The numner of k-mers in the genome being looked in.
-			@param positions [out] The result set.
+			@param workload [in] the queries, data, and frequencies
+			@return the local score for the key
 		*/
-		void compute_hamming_set(uint64_t twice_the_max_distance, uint64_t key, const uint64_t *data, size_t data_length, std::vector<sequence_score_pair> &positions)
+		double compute_hamming_set(double threshold, uint64_t twice_the_max_distance, uint64_t key, job &workload)
 			{
-			const uint64_t *end = data + data_length;
+			double score = 0;
+			const uint64_t *end = workload.genome_guides.data() + workload.genome_guides.size();
 
-			for (const uint64_t *which = data; which < end; which++)
+			for (const uint64_t *which = workload.genome_guides.data(); which < end; which++)
 				if (distance(key, *which) <= twice_the_max_distance)
-					positions.push_back(sequence_score_pair(*which, 1));
+					{
+					double frequency = workload.genome_guide_frequencies[which - &workload.genome_guides[0]];
+					score += scorer.score(key, *which) * frequency;
+					if (score > threshold)
+						return 0.0;
+					}
+
+			return score;
 			}
 
 	public:
@@ -74,11 +88,10 @@ class hamming_distance : public finder
 			HAMMING_DISTANCE::MAKE_INDEX()
 			------------------------------
 		*/
-			/*!
-				@brief Do any necessary indexing of the genome before starting the search process (for hamming distance, this does nothing) .
-				@param genome [in] The genome being searched.
-			*/
-
+		/*!
+			@brief Do any necessary indexing of the genome before starting the search process (for hamming distance, this does nothing) .
+			@param genome [in] The genome being searched.
+		*/
 		virtual void make_index(const std::vector<uint64_t> &genome)
 			{
 			/* Nothing */
@@ -90,17 +103,24 @@ class hamming_distance : public finder
 		*/
 		/*!
 			@brief THREAD SAFE.  Search the genome for the given guides in test\_guides
-			@param start [in] Where in the test_guides to start searching from.
-			@param end [in] Where in the test_guides to start searching to.
-			@param test_guides [in] The list of guides to look for - and we only look for those between start and end.
-			@param packed_genome_guides [in] The genome to look in.
+			@param workload [in] the queries, data, and frequencies
 			@param answer [out] The result set
 		*/
-		virtual void process_chunk(size_t start, size_t end, std::vector<uint64_t> &test_guides, std::vector<uint64_t> &packed_genome_guides, std::vector<std::vector<sequence_score_pair>> &answer)
+		virtual void process_chunk(job &workload)
 			{
-			std::vector<uint64_t> variations;
+			uint64_t guide_index;
+			uint64_t end = workload.guide.size();
+			while ((guide_index = workload.get_next()) < end)
+				{
+				if (workload.guide_frequencies[guide_index] != 1)
+					continue;
 
-			for (size_t which = start; which < end; which++)
-				compute_hamming_set(8, test_guides[which], packed_genome_guides.data(), packed_genome_guides.size(), answer[which]);
+				uint64_t guide = workload.guide[guide_index];
+				double score = compute_hamming_set(0.75, 8, guide, workload);
+				/*
+					FIX:
+						Write this out to disk using the same code as used in the fast_binary_search version
+				*/
+				}
 			}
 	};

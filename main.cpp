@@ -12,6 +12,7 @@
 
 #include "file.h"
 #include "finder.h"
+#include "hamming_distance.h"
 #include "encode_kmer_2bit.h"
 #include "encode_kmer_3bit.h"
 #include "fast_binary_search.h"
@@ -181,7 +182,7 @@ int usage(const char *exename)
 	std::cout << "Usage:" << exename << "[-b | -B | -h] [-f<filename>] [-o<filename>] [-t<threadcount>\n";
 	std::cout << "       -b for binary search [default]\n";
 //	std::cout << "       -B for binary search using AVX512 instructions\n";
-//	std::cout << "       -h for hamming distance\n";
+	std::cout << "       -h for hamming distance\n";
 	std::cout << "       -t<threads> the number of threads to use when searching [default = corecount (inc hyperthreads)]\n";
 	std::cout << "       -f<filename> use <filename> as the genome\n";
 	std::cout << "       -o<filename> use <filename> as the output file\n";
@@ -274,16 +275,23 @@ int main(int argc, const char *argv[])
 		{
 		TESTSIZE = 10000;
 		workload.guide.resize(TESTSIZE);
+		workload.guide_frequencies.resize(TESTSIZE);
 //		select_random_vectors(workload.guide, workload.genome_guides);
 		select_pseudo_random_vectors(workload.guide, workload.genome_guides);
 		sort(workload.guide.begin(), workload.guide.end());
+		for (size_t which = 0; which < TESTSIZE; which++)
+			workload.guide_frequencies[which] = 1;
 		}
 	else
 		{
 		TESTSIZE = workload.genome_guides.size();
 		workload.guide.resize(TESTSIZE);
+		workload.guide_frequencies.resize(TESTSIZE);
 		for (size_t which = 0; which < TESTSIZE; which++)
+			{
 			workload.guide[which] = workload.genome_guides[which];
+			workload.guide_frequencies[which] = workload.genome_guide_frequencies[which];
+			}
 		}
 
 	std::cout << "Loaded " << workload.guide.size() << " test guides, " <<  workload.genome_guides.size() << " genome guides" << '\n';
@@ -291,18 +299,21 @@ int main(int argc, const char *argv[])
 	/*
 		Generate the index over the guides.
 	*/
-	finder *searcher;
+	finder *searcher = nullptr;
 	if (mode == FAST_BINARY_SEARCH)
+		{
+		puts("Fast Binary Search");
 		searcher = new fast_binary_search;
+		}
 	else if (mode == FAST_BINARY_SEARCH_AVX512)
 		{
 		exit(printf("Under development\n"));
 //		searcher = new fast_binary_search_avx512;
 		}
-	else // if (mode == HAMMING_DISTANCE)
+	else if (mode == HAMMING_DISTANCE)
 		{
-		exit(printf("Under development\n"));
-//		searcher = new hamming_distance;
+		puts("Hamming Distance\n");
+		searcher = new hamming_distance;
 		}
 
 	std::cout << "Indexing\n";

@@ -24,10 +24,11 @@ fast_binary_search_avx512.o: fast_binary_search_avx512.cpp fast_binary_search_av
 
 file.o: file.cpp file.h asserts.h
 
-main.o: main.cpp file.h finder.h job.h sequence_score_pair.h encode_kmer_2bit.h encode_kmer_3bit.h fast_binary_search.h score_mit_local.h
+main.o: main.cpp file.h finder.h job.h sequence_score_pair.h encode_kmer_2bit.h encode_kmer_3bit.h fast_binary_search.h score_mit_local.h hamming_distance.h
 
 score_mit_local.o: score_mit_local.cpp score_mit_local.h
 
+hamming_distance.o : hamming_distance.cpp hamming_distance.h
 
 
 clean :
