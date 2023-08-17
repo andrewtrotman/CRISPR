@@ -115,8 +115,6 @@ std::string guides_filename = "OryzaSativaGuides.txt";
 const char *output_filename = nullptr;
 size_t thread_count = std::thread::hardware_concurrency();
 
-
-
 /*
 	READ_GUIDES()
 	-------------
@@ -281,6 +279,12 @@ int main(int argc, const char *argv[])
 		sort(workload.guide.begin(), workload.guide.end());
 		for (size_t which = 0; which < TESTSIZE; which++)
 			workload.guide_frequencies[which] = 1;
+
+
+
+printf("3bit: 0x%llX\n",  encode_kmer_3bit::pack_20mer("AAAAAAAAACATAAACTACC"));
+printf("2bit: 0x%llX\n",  encode_kmer_2bit::pack_20mer("AAAAAAAAACATAAACTACC"));
+
 		}
 	else
 		{

@@ -69,30 +69,11 @@ inline double fast_binary_search::compute_intersection(uint64_t guide, uint64_t 
 	if (*found == key)
 		{
 		double frequency = workload->genome_guide_frequencies[found - &workload->genome_guides[0]];
+printf("PS:%f\n", scorer.score(guide, key));
 		return scorer.score(guide, key) * frequency;			// compute the score of the variant.
 		}
 
 	return 0.0;		// no match found so there is no effect on the cumulative score.
-	}
-
-/*
-	FAST_BINARY_SEARCH::COMPUTE_INTERSECTION_LIST()
-	-----------------------------------------------
-*/
-double fast_binary_search::compute_intersection_list(double threshold, const uint64_t *key, size_t key_length) const
-	{
-	const uint64_t guide	= *key;
-	const uint64_t *key_end = key + key_length;
-	double score = 0.0;
-
-	for (const uint64_t *current_key = key + 1; current_key < key_end; current_key++)
-		{
-		score += compute_intersection(guide, *current_key);
-		if (score > threshold)
-			return 0.0;
-		}
-
-	return score;
 	}
 
 /*
@@ -104,7 +85,11 @@ double fast_binary_search::generate_variations(double threshold, uint64_t guide,
 	double score = 0;
 
 	if (in_genome(sequence))
+		{
 		score = compute_intersection(guide, sequence);
+		if (score > threshold)
+			throw 1;
+		}
 
 	if (replacements == 4)
 		return score;

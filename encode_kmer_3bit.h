@@ -127,12 +127,8 @@ class encode_kmer_3bit
 			{
 			uint64_t re_packed = 0;
 
-std::cout << unpack_20mer(packed_sequence) << " -> ";
-
 			for (size_t pos = 0; pos < 20; pos++)
 				re_packed = (re_packed << 2) | encode_kmer_2bit::kmer_encoding_table[kmer_encoding_table[(packed_sequence >> ((19 - pos) * 3)) & 7]];
-
-std::cout << encode_kmer_2bit::unpack_20mer(re_packed) << "\n";
 
 			return re_packed;
 			}

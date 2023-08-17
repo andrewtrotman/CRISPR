@@ -66,12 +66,10 @@ class hamming_distance : public finder
 			for (const uint64_t *which = workload.genome_guides.data(); which < end; which++)
 				if (distance(key, *which) <= twice_the_max_distance)
 					{
-puts("Compute Score");
-encode_kmer_3bit::pack_20mer_into_2bit(*which);
-
 					double frequency = workload.genome_guide_frequencies[which - &workload.genome_guides[0]];
-printf("Score is: %f\n", frequency);
-					score += scorer.score(key, *which) * frequency;
+					double part_score = scorer.score(encode_kmer_3bit::pack_20mer_into_2bit(key), encode_kmer_3bit::pack_20mer_into_2bit(*which));
+printf("PS:%f\n", part_score);
+					score += part_score * frequency;
 					if (score > threshold)
 						return 0.0;
 					}
@@ -117,14 +115,19 @@ printf("Score is: %f\n", frequency);
 			uint64_t end = workload.guide.size();
 			while ((guide_index = workload.get_next()) < end)
 				{
-				if (workload.guide_frequencies[guide_index] != 1)
-					continue;
+//				if (workload.guide_frequencies[guide_index] != 1)
+//					continue;
 
 				uint64_t guide = workload.guide[guide_index];
+
+guide = 0x24924928F24AE52;
+
 				double score = compute_hamming_set(0.75, 8, guide, workload);
+
+printf("%llX (%s) -> %f\n", guide, encode_kmer_3bit::unpack_20mer(guide).c_str(), score);
+
 				if (score != 0.0)
 					{
-puts("Save to disk");
 					score = 100.0 / (score + 100.0);
 					save_result(workload, guide, 3, score);
 					}
