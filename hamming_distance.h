@@ -117,10 +117,11 @@ class hamming_distance : public finder
 
 				uint64_t guide = workload.guide[guide_index];
 				double score = compute_hamming_set(0.75, 8, guide, workload);
-				/*
-					FIX:
-						Write this out to disk using the same code as used in the fast_binary_search version
-				*/
+				if (score != 0.0)
+					{
+					score = 100.0 / (score + 100.0);
+					save_result(workload, guide, score);
+					}
 				}
 			}
 	};

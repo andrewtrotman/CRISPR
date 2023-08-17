@@ -195,7 +195,6 @@ class fast_binary_search : public finder
 			{
 			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
 			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
-			char output_buffer[50];
 
 			this->workload = &workload;
 			uint64_t end = workload.guide.size();
@@ -211,33 +210,8 @@ class fast_binary_search : public finder
 					double score = generate_variations(threshold_sum, guide);
 					if (score != 0.0)
 						{
-						/*
-							Convert the local score to a global score then write to the output file
-						*/
-						score = 100.0 / (score + 100.0);				// convert to the MIT Global Score
-						encode_kmer_2bit::unpack_20mer(output_buffer, guide);
-						output_buffer[20] = ' ';
-						int bytes = snprintf(&output_buffer[21], &output_buffer[49] - &output_buffer[21], "%2.2f\n", score);
-//						auto [string_end, error] = std::to_chars(&output_buffer[21], &output_buffer[49], (int)(score * 100.0));
-//						*string_end++ = '\n';
-//						*string_end = '\0';
-
-						workload.file_mutex.lock();
-//							fwrite(output_buffer, sizeof(char), string_end - output_buffer, workload.output_file);
-							fwrite(output_buffer, sizeof(char), bytes + 21, workload.output_file);
-						workload.file_mutex.unlock();
-
-						/*
-							Update the stats
-						*/
-						workload.hits++;
-						if (score > workload.best_score)
-							{
-							workload.stats_mutex.lock();
-								workload.best_20mer = guide;
-								workload.best_score = score;
-							workload.stats_mutex.unlock();
-							}
+						score = 100.0 / (score + 100.0);
+						save_result(workload, guide, score);
 						}
 					}
 				catch (...)
