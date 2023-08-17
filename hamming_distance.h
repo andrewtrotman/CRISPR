@@ -12,6 +12,7 @@
 #pragma once
 
 #include "score_mit_local.h"
+#include "encode_kmer_3bit.h"
 
 #if defined(__APPLE__) || defined(__linux__)
 	#define __popcnt64 __builtin_popcountll
@@ -65,7 +66,11 @@ class hamming_distance : public finder
 			for (const uint64_t *which = workload.genome_guides.data(); which < end; which++)
 				if (distance(key, *which) <= twice_the_max_distance)
 					{
+puts("Compute Score");
+encode_kmer_3bit::pack_20mer_into_2bit(*which);
+
 					double frequency = workload.genome_guide_frequencies[which - &workload.genome_guides[0]];
+printf("Score is: %f\n", frequency);
 					score += scorer.score(key, *which) * frequency;
 					if (score > threshold)
 						return 0.0;
@@ -119,8 +124,9 @@ class hamming_distance : public finder
 				double score = compute_hamming_set(0.75, 8, guide, workload);
 				if (score != 0.0)
 					{
+puts("Save to disk");
 					score = 100.0 / (score + 100.0);
-					save_result(workload, guide, score);
+					save_result(workload, guide, 3, score);
 					}
 				}
 			}

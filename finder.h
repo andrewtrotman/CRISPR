@@ -16,6 +16,7 @@
 
 #include "job.h"
 #include "encode_kmer_2bit.h"
+#include "encode_kmer_3bit.h"
 #include "sequence_score_pair.h"
 
 /*
@@ -69,15 +70,20 @@ class finder
 			@brief THREAD SAFE save the result to the disk.
 			@param workload [in] The job - including the file handle and the ability to lock it.
 			@param kmer [in] The 20-mer to write to the file.
+			@param bits_per_guide [in] is this encoding 2 bits per guide or 3 bits per base (fast_binary_search or hamming)
 			@param score [in] The score associated with the kmer.
 		*/
-		void save_result(job &workload, uint64_t guide, double score)
+		void save_result(job &workload, uint64_t guide, size_t bits_per_guide, double score)
 			{
 			char output_buffer[50];
 			/*
 				Convert the local score to a global score then write to the output file
 			*/
-			encode_kmer_2bit::unpack_20mer(output_buffer, guide);
+			if (bits_per_guide == 2)
+				encode_kmer_2bit::unpack_20mer(output_buffer, guide);
+			else
+				encode_kmer_3bit::unpack_20mer(output_buffer, guide);
+
 			output_buffer[20] = ' ';
 			int bytes = snprintf(&output_buffer[21], &output_buffer[49] - &output_buffer[21], "%2.2f\n", score);
 //						auto [string_end, error] = std::to_chars(&output_buffer[21], &output_buffer[49], (int)(score * 100.0));

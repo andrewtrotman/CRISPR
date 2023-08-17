@@ -24,6 +24,8 @@
 */
 class encode_kmer_2bit
 	{
+	friend class encode_kmer_3bit;
+
 	private:
 		/*
 			Fast lookup for encoding and decoding kmers

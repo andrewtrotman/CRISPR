@@ -14,6 +14,10 @@
 
 #include <string>
 
+#include <iostream>
+
+#include "encode_kmer_2bit.h"
+
 /*
 	CLASS ENCODE_KMER_3BIT
 	----------------------
@@ -83,6 +87,23 @@ class encode_kmer_3bit
 			@param packed_sequence [in] The packed 20-mer.
 			@returns The DNA sequence as a 20-character long string.
 		*/
+		static void unpack_20mer(char *into, uint64_t packed_sequence)
+			{
+			for (int32_t pos = 19; pos >= 0; pos--)
+				*into++ = kmer_encoding_table[(packed_sequence >> (pos * 3)) & 7];
+
+			*into = '\0';
+			}
+
+		/*
+			ENCODE_KMER_3BIT::UNPACK_20MER()
+			--------------------------------
+		*/
+		/*!
+			@brief Turn a packed 20-mer into an ASCII representation (ACGT).
+			@param packed_sequence [in] The packed 20-mer.
+			@returns The DNA sequence as a 20-character long string.
+		*/
 		static std::string unpack_20mer(uint64_t packed_sequence)
 			{
 			std::string sequence;
@@ -91,5 +112,28 @@ class encode_kmer_3bit
 				sequence +=kmer_encoding_table[(packed_sequence >> (pos * 3)) & 7];
 
 			return sequence;
+			}
+
+		/*
+			ENCODE_KMER_3BIT::PACK_20MER_INTO_2BIT()
+			----------------------------------------
+		*/
+		/*!
+			@brief Turn a packed 20-mer into a 2-bit packed 20-mer
+			@param packed_sequence [in] The packed 20-mer.
+			@returns The DNA sequence as a 2-bit encoding.
+		*/
+		static uint64_t pack_20mer_into_2bit(uint64_t packed_sequence)
+			{
+			uint64_t re_packed = 0;
+
+std::cout << unpack_20mer(packed_sequence) << " -> ";
+
+			for (size_t pos = 0; pos < 20; pos++)
+				re_packed = (re_packed << 2) | encode_kmer_2bit::kmer_encoding_table[kmer_encoding_table[(packed_sequence >> ((19 - pos) * 3)) & 7]];
+
+std::cout << encode_kmer_2bit::unpack_20mer(re_packed) << "\n";
+
+			return re_packed;
 			}
 	};

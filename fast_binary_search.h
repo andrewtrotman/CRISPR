@@ -211,7 +211,7 @@ class fast_binary_search : public finder
 					if (score != 0.0)
 						{
 						score = 100.0 / (score + 100.0);
-						save_result(workload, guide, score);
+						save_result(workload, guide, 2, score);
 						}
 					}
 				catch (...)

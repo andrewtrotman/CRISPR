@@ -312,7 +312,7 @@ int main(int argc, const char *argv[])
 		}
 	else if (mode == HAMMING_DISTANCE)
 		{
-		puts("Hamming Distance\n");
+		puts("Hamming Distance");
 		searcher = new hamming_distance;
 		}
 
@@ -361,7 +361,8 @@ int main(int argc, const char *argv[])
 	*/
 	std::cout << "Number of test guides: " << TESTSIZE << '\n';
 	std::cout << "Number of test guides with matches within 4: " << workload.hits << '\n';
-	std::cout << "Best score: " << workload.best_score << " " << packer_2bit.unpack_20mer(workload.best_20mer) << '\n';
+	std::string overall_best = (mode == FAST_BINARY_SEARCH || mode == FAST_BINARY_SEARCH_AVX512) ? packer_2bit.unpack_20mer(workload.best_20mer) : packer_3bit.unpack_20mer(workload.best_20mer);
+	std::cout << "Best score: " << workload.best_score << " " << overall_best << '\n';
 	std::cout << "Mean Execution time (getvar+intersect): " << duration2 / 1000000.001 << " seconds" << '\n';
 	auto end_main = std::chrono::steady_clock::now(); // End timing
 	auto duration_main = std::chrono::duration_cast<std::chrono::microseconds>(end_main - start_main).count();
