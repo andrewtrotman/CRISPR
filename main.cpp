@@ -81,7 +81,7 @@ void uniq(std::vector<uint64_t> &data, std::vector<uint16_t> &frequencies)
 			{
 			was++;
 			data[was] = data[index];
-			frequencies.push_back(count > std::numeric_limits<uint16_t>::max() ? std::numeric_limits<uint16_t>::max() : count);
+			frequencies.push_back(count > (std::numeric_limits<uint16_t>::max)() ? (std::numeric_limits<uint16_t>::max)() : count);
 			count = 1;
 			}
 		index++;

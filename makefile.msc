@@ -4,14 +4,12 @@ CPP_LINK_FLAGS = /O2 /EHsc
 CPPFLAGS = $(CPP_LINK_FLAGS) /c
 CPP = cl
 
-fast_binary_search.exe : fast_binary_search.obj main.obj fast_binary_search_avx512.obj score_mit_local.obj encode_kmer_2bit.obj encode_kmer_3bit.obj file.obj file_read_only.obj
+fast_binary_search.exe : fast_binary_search.obj main.obj score_mit_local.obj encode_kmer_2bit.obj encode_kmer_3bit.obj file.obj asserts.obj
 	$(CPP) $(CPP_LINK_FLAGS) $**
 
 main.obj : main.cpp finder.h hamming_distance.h
 
 fast_binary_search.obj : fast_binary_search.cpp fast_binary_search.h finder.h
-
-fast_binary_search_avx512.obj : fast_binary_search_avx512.cpp fast_binary_search_avx512.h fast_binary_search.h finder.h
 
 score_mit_local.obj : score_mit_local.cpp score_mit_local.h
 
@@ -19,9 +17,9 @@ encode_kmer_2bit.obj : encode_kmer_2bit.cpp encode_kmer_2bit.h
 
 encode_kmer_3bit.obj : encode_kmer_3bit.cpp encode_kmer_3bit.h
 
-file.obj : file.cpp file.h file_read_only.h
+file.obj : file.cpp file.h file.h
 
-file_read_only.obj : file_read_only.cpp file_read_only.h
+asserts.obj : asserts.cpp asserts.h
 
 clean :
 	del fast_binary_search.exe *.obj
