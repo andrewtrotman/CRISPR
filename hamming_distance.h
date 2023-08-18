@@ -68,10 +68,10 @@ class hamming_distance : public finder
 					{
 					double frequency = workload.genome_guide_frequencies[which - &workload.genome_guides[0]];
 					double part_score = scorer.score(encode_kmer_3bit::pack_20mer_into_2bit(key), encode_kmer_3bit::pack_20mer_into_2bit(*which));
-printf("PS:%f\n", part_score);
+//printf("PS:%f\n", part_score);
 					score += part_score * frequency;
 					if (score > threshold)
-						return 0.0;
+						return threshold + 1.0;
 					}
 
 			return score;
@@ -111,22 +111,24 @@ printf("PS:%f\n", part_score);
 		*/
 		virtual void process_chunk(job &workload)
 			{
+			constexpr double threshold = 0.75;												// this is the MIT Global score needed to be useful
+			constexpr double threshold_sum = (100.0 / threshold) - 100.0;			// the sum of MIT Local scores must be smaller than this to to scores
 			uint64_t guide_index;
 			uint64_t end = workload.guide.size();
 			while ((guide_index = workload.get_next()) < end)
 				{
-//				if (workload.guide_frequencies[guide_index] != 1)
-//					continue;
+				if (workload.guide_frequencies[guide_index] != 1)
+					continue;
 
 				uint64_t guide = workload.guide[guide_index];
 
-guide = 0x24924928F24AE52;
+//guide = 0x24924928F24AE52;
 
-				double score = compute_hamming_set(0.75, 8, guide, workload);
+				double score = compute_hamming_set(threshold_sum, 8, guide, workload);
 
-printf("%llX (%s) -> %f\n", guide, encode_kmer_3bit::unpack_20mer(guide).c_str(), score);
+//printf("%llX (%s) -> %f\n", guide, encode_kmer_3bit::unpack_20mer(guide).c_str(), score);
 
-				if (score != 0.0)
+				if (score <= threshold_sum)
 					{
 					score = 100.0 / (score + 100.0);
 					save_result(workload, guide, 3, score);

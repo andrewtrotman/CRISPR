@@ -208,13 +208,13 @@ class fast_binary_search : public finder
 				try
 					{
 
-guide =  0x1301C5;
+//guide =  0x1301C5;
 
 					double score = generate_variations(threshold_sum, guide);
 
-printf("%llX (%s) -> %f\n", guide, encode_kmer_2bit::unpack_20mer(guide).c_str(), score);
+//printf("%llX (%s) -> %f\n", guide, encode_kmer_2bit::unpack_20mer(guide).c_str(), score);
 
-					if (score != 0.0)
+					if (score <= threshold_sum)
 						{
 						score = 100.0 / (score + 100.0);
 						save_result(workload, guide, 2, score);

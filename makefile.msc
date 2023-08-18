@@ -1,7 +1,7 @@
 all : fast_binary_search.exe
 
-CPP_LINK_FLAGS = /EHsc /Zi
-CPPFLAGS = $(CPP_LINK_FLAGS) /Zi /c
+CPP_LINK_FLAGS = /O2 /EHsc /Zi
+CPPFLAGS = $(CPP_LINK_FLAGS) /c
 CPP = cl
 
 fast_binary_search.exe : fast_binary_search.obj main.obj score_mit_local.obj encode_kmer_2bit.obj encode_kmer_3bit.obj file.obj asserts.obj
