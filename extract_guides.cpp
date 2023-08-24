@@ -51,8 +51,11 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 
 	for (const uint8_t *base = chromosome + 21; *base != '\0'; base++)
 		{
-		if (*base == 'G' && *(base + 1) == 'G')
+		if (*base == 'G' && *(base + 1) == 'G') // || (*base == 'A' && *(base + 1) == 'G')
 			{
+			/*
+				If we have GG then its a guide (query), if we have AG or GG then its an off-target guide (document).
+			*/
 			bool failed = false;
 			const uint8_t *stop_at = base - 20;
 			const uint8_t *check;
@@ -75,8 +78,11 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 				into.write(number, end_of_number - number + 1);
 				}
 			}
-		if (*(base - 20) == 'C' && *(base - 19) == 'C')
+		if (*(base - 20) == 'C' && *(base - 19) == 'C') // || (*(base - 20) == 'C' && *(base - 19) == 'T')
 			{
+			/*
+				If we have CC then its a guide (query), if we have TC or CC then its an off-target guide (document).
+			*/
 			bool failed = false;
 			const uint8_t *stop_at = base;
 			const uint8_t *check;

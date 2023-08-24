@@ -1,7 +1,7 @@
-#all : fast_binary_search extract_guides
-all : fast_binary_search
+all : fast_binary_search extract_guides
+#all : fast_binary_search
 
-CPPFLAGS = -std=c++11 -pthread -O3 -Wall -march=native 
+CPPFLAGS = -std=c++17 -pthread -O3 -Wall -march=native 
 #CPPFLAGS = -std=c++11 -pthread -g -Wall -march=native 
 CXX = g++
 
