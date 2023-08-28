@@ -120,32 +120,25 @@ size_t thread_count = std::thread::hardware_concurrency();
 	-------------
 */
 /*!
-	@brief Read a load of 20-mers from disk, encoded one per line (everything after the 20th character on each line is ignored)
+	@brief Read a load of 20-mers from disk, encoded one per line (everything after the 20th character on each line is ignored except the last character)
 	@param filename [in] The name of the file to read.
 	@param pack_20mer [in] A functor that will pack a read sequence into a 64-bit integer.
-	@param map [in] if true mmap the file, if false then use OS file I/O methods.
-	@returns A sorted vector of the packed sequences once read from disk.
+	@param off_targets [out] The list of unique off-target sites (documents).
+	@param off_target_frequencies [out] The frequencies of each off-target sites (documents).
+	@param guides [out] The list of unique guides (queries).
+	@param guide_frequencies [out] The frequences of each guides (quereies)
 */
 template <typename PACKER>
-std::vector<uint64_t> read_guides(std::vector<uint16_t> &frequencies, const std::string &filename, PACKER pack_20mer, bool map = true)
+void read_guides(const std::string &filename, PACKER pack_20mer, std::vector<uint64_t>&off_targets, std::vector<uint16_t> &off_target_frequencies, std::vector<uint64_t>&guides, std::vector<uint16_t> &guide_frequencies)
 	{
-	std::vector<uint64_t> packed_guides;
 	std::string data;
 	JASS::file::file_read_only memory_map;
 	char *guide;
 	const uint8_t *address_in_memory;
 	size_t length;
 
-	if (map)
-		{
-		memory_map.open(filename);
-		length = memory_map.read_entire_file(address_in_memory);
-		}
-	else
-		{
-		length = JASS::file::read_entire_file(filename, data);
-		address_in_memory = (const uint8_t *)&data[0];
-		}
+	memory_map.open(filename);
+	length = memory_map.read_entire_file(address_in_memory);
 	guide = (char *)address_in_memory - 1;
 
 	if (length == 0)
@@ -157,18 +150,27 @@ std::vector<uint64_t> read_guides(std::vector<uint16_t> &frequencies, const std:
 	do
 		{
 		guide++;
-		packed_guides.push_back(pack_20mer(guide));
-		guide = strchr(guide + 20, '\n');
+		char *end_of_guide = strchr(guide + 20, '\n');
+		uint64_t packed_guide = pack_20mer(guide);
+		/*
+			Sequneces ending in GG are guides (queries), those ending GG or AG are off-target sites (documents).
+			So we always push to the off_targets, and sometimes push to the guides.
+		*/
+		off_targets.push_back(packed_guide);
+		if (*(end_of_guide - 1) == 'G')
+			guides.push_back(packed_guide);
+
+		guide = end_of_guide;
 		}
 	while (((uint8_t *)guide - (uint8_t *)address_in_memory) < length - 1);
 
 	/*
-		Sort and uniq the list
+		Sort and uniq the listd
 	*/
-	std::sort(packed_guides.begin(), packed_guides.end());
-	uniq(packed_guides, frequencies);
-
-	return packed_guides;
+	std::sort(guides.begin(), guides.end());
+	uniq(guides, guide_frequencies);
+	std::sort(off_targets.begin(), off_targets.end());
+	uniq(off_targets, off_target_frequencies);
 	}
 
 /*
@@ -259,9 +261,9 @@ int main(int argc, const char *argv[])
 	*/
 	auto time_io_start = std::chrono::steady_clock::now(); // Start timing
 	if (mode == FAST_BINARY_SEARCH || mode == FAST_BINARY_SEARCH_AVX512)
-		workload.genome_guides = read_guides(workload.genome_guide_frequencies, guides_filename, packer_2bit.pack_20mer);
+		read_guides(guides_filename, packer_2bit.pack_20mer, workload.genome_guides, workload.genome_guide_frequencies, workload.guide, workload.guide_frequencies);
 	else
-		workload.genome_guides = read_guides(workload.genome_guide_frequencies, guides_filename, packer_3bit.pack_20mer);
+		read_guides(guides_filename, packer_3bit.pack_20mer, workload.genome_guides, workload.genome_guide_frequencies, workload.guide, workload.guide_frequencies);
 	auto time_io_end = std::chrono::steady_clock::now(); // Stop timing
 	auto time_io_duration = std::chrono::duration_cast<std::chrono::microseconds>(time_io_end - time_io_start).count();
 	std::cout << "Load encode time: " << time_io_duration / 1000000.001 << " seconds" << '\n';
@@ -274,28 +276,6 @@ int main(int argc, const char *argv[])
 		TESTSIZE = 10000;
 		workload.guide.resize(TESTSIZE);
 		workload.guide_frequencies.resize(TESTSIZE);
-//		select_random_vectors(workload.guide, workload.genome_guides);
-		select_pseudo_random_vectors(workload.guide, workload.genome_guides);
-		sort(workload.guide.begin(), workload.guide.end());
-		for (size_t which = 0; which < TESTSIZE; which++)
-			workload.guide_frequencies[which] = 1;
-
-
-
-printf("3bit: 0x%llX\n",  encode_kmer_3bit::pack_20mer("AAAAAAAAACATAAACTACC"));
-printf("2bit: 0x%llX\n",  encode_kmer_2bit::pack_20mer("AAAAAAAAACATAAACTACC"));
-
-		}
-	else
-		{
-		TESTSIZE = workload.genome_guides.size();
-		workload.guide.resize(TESTSIZE);
-		workload.guide_frequencies.resize(TESTSIZE);
-		for (size_t which = 0; which < TESTSIZE; which++)
-			{
-			workload.guide[which] = workload.genome_guides[which];
-			workload.guide_frequencies[which] = workload.genome_guide_frequencies[which];
-			}
 		}
 
 	std::cout << "Loaded " << workload.guide.size() << " test guides, " <<  workload.genome_guides.size() << " genome guides" << '\n';

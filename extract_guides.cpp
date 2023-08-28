@@ -51,8 +51,17 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 
 	for (const uint8_t *base = chromosome + 21; *base != '\0'; base++)
 		{
-		if ((*base == 'G' && *(base + 1) == 'G') || (*base == 'A' && *(base + 1) == 'G'))
+		/*
+			According to
+				J. Bradford, T. Chappell, D. Perrin (2022), Rapid Whole-Genome Identification of High Quality CRISPR Guide RNAs with the Crackling Method. The CRISPR Journal 5(3):410-421. http://doi.org/10.1089/crispr.2021.0102
+			The sequence must not start with a T, and must end NAG or NGG (see section "Off-target scoring performance").
+			That is, the regular expression is [ACG][ATCG]20[AG]G.  Were GG is a guid (query) and GG or AG is an off-target
+			site (document).
+		*/
+		if (*(base + 1) == 'G' && (*base == 'A' || *base == 'G'))
 			{
+			if (*base - 21 == 'T')
+				continue;
 			/*
 				If we have GG then its a guide (query), if we have AG or GG then its an off-target guide (document).
 			*/
@@ -82,8 +91,16 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 
 				}
 			}
-		if ((*(base - 20) == 'C' && *(base - 19) == 'C') || (*(base - 20) == 'C' && *(base - 19) == 'T'))
+		/*
+			Include the reverse complement sequences.  That is, ones that the other DNA strand matches the regular expression [ACG][ATCG]20[AG]G.
+			That is, this strand is C[TC][ACTG]20[TGC].
+
+			NOTE: THIS CANNOT BE AN ELSE AS THE CC MIGHT OVERLAP A GG
+		*/
+		if (*(base - 20) == 'C' && (*(base - 19) == 'C' || *(base - 19) == 'T'))
 			{
+			if (*base == 'A')
+				continue;
 			/*
 				If we have CC then its a guide (query), if we have TC or CC then its an off-target guide (document).
 			*/
@@ -107,7 +124,7 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 
 				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 19);
 				*end_of_number++ = ' ';
-				*end_of_number++ = *(base - 19);
+				*end_of_number++ = *(base - 19) == 'C' ? 'G' : 'A';				// complement of the start (C[TC] -> G[AG]) so output A for off-targets (documents) and G for guides (queries) or off-targets (documents).
 				*end_of_number = '\n';
 				into.write(number, end_of_number - number + 1);
 				}
