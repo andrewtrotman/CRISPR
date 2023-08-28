@@ -1,36 +1,28 @@
-all : fast_binary_search extract_guides
-#all : fast_binary_search
+all : fast_binary_search.exe extract_guides.exe
 
-CPPFLAGS = -std=c++17 -pthread -O3 -Wall -march=native 
-#CPPFLAGS = -std=c++11 -pthread -g -Wall -march=native 
-CXX = g++
+CPP_LINK_FLAGS = /std:c++17 /EHsc /Zi
+CPPFLAGS = $(CPP_LINK_FLAGS) /c
+CPP = cl
 
-extract_guides : extract_guides.o file.o asserts.o
-	$(CXX) $(CPPFLAGS) $^ -o $@
+fast_binary_search.exe : fast_binary_search.obj main.obj score_mit_local.obj encode_kmer_2bit.obj encode_kmer_3bit.obj file.obj asserts.obj
+	$(CPP) $(CPP_LINK_FLAGS) $**
 
-fast_binary_search : main.o fast_binary_search.o score_mit_local.o encode_kmer_2bit.o encode_kmer_3bit.o file.o asserts.o
-	$(CXX) $(CPPFLAGS) $^ -o $@
+extract_guides.exe : extract_guides.obj file.obj asserts.obj
+	$(CPP) $(CPP_LINK_FLAGS) $**
 
-asserts.o: asserts.cpp asserts.h
+main.obj : main.cpp finder.h hamming_distance.h
 
-encode_kmer_2bit.o: encode_kmer_2bit.cpp encode_kmer_2bit.h
+fast_binary_search.obj : fast_binary_search.cpp fast_binary_search.h finder.h
 
-encode_kmer_3bit.o: encode_kmer_3bit.cpp encode_kmer_3bit.h
+score_mit_local.obj : score_mit_local.cpp score_mit_local.h
 
-extract_guides.o: extract_guides.cpp file.h
+encode_kmer_2bit.obj : encode_kmer_2bit.cpp encode_kmer_2bit.h
 
-fast_binary_search.o: fast_binary_search.cpp forceinline.h score_mit_local.h fast_binary_search.h job.h finder.h sequence_score_pair.h encode_kmer_2bit.h
+encode_kmer_3bit.obj : encode_kmer_3bit.cpp encode_kmer_3bit.h
 
-fast_binary_search_avx512.o: fast_binary_search_avx512.cpp fast_binary_search_avx512.h fast_binary_search.h job.h finder.h sequence_score_pair.h score_mit_local.h encode_kmer_2bit.h
+file.obj : file.cpp file.h file.h
 
-file.o: file.cpp file.h asserts.h
-
-main.o: main.cpp file.h finder.h job.h sequence_score_pair.h encode_kmer_2bit.h encode_kmer_3bit.h fast_binary_search.h score_mit_local.h hamming_distance.h
-
-score_mit_local.o: score_mit_local.cpp score_mit_local.h
-
-hamming_distance.o : hamming_distance.cpp hamming_distance.h
-
+asserts.obj : asserts.cpp asserts.h
 
 clean :
-	rm fast_binary_search extract_guides *.o
+	del fast_binary_search.exe *.obj
