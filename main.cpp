@@ -147,16 +147,30 @@ void read_guides(const std::string &filename, PACKER pack_20mer, std::vector<uin
 		exit(1);
 		}
 
+int line = 0;
 	do
 		{
+		line++;
 		guide++;
-		char *end_of_guide = strchr(guide + 20, '\n');
+if (line >= 72172820)
+	{
+	printf("%20.20s\n", guide);
+	fflush(stdout);
+	}
 		uint64_t packed_guide = pack_20mer(guide);
+
+if (packed_guide == 4511986849415)
+	{
+	printf("line %d: %llX [%20.20s]\n", line, packed_guide, guide);
+	fflush(stdout);
+	}
+
 		/*
-			Sequneces ending in GG are guides (queries), those ending GG or AG are off-target sites (documents).
+			Sequences ending in GG are guides (queries), those ending GG or AG are off-target sites (documents).
 			So we always push to the off_targets, and sometimes push to the guides.
 		*/
 		off_targets.push_back(packed_guide);
+		char *end_of_guide = strchr(guide + 20, '\n');
 		if (*(end_of_guide - 1) == 'G')
 			guides.push_back(packed_guide);
 
@@ -165,7 +179,7 @@ void read_guides(const std::string &filename, PACKER pack_20mer, std::vector<uin
 	while (((uint8_t *)guide - (uint8_t *)address_in_memory) < length - 1);
 
 	/*
-		Sort and uniq the listd
+		Sort and uniq the lists
 	*/
 	std::sort(guides.begin(), guides.end());
 	uniq(guides, guide_frequencies);
@@ -262,7 +276,7 @@ int main(int argc, const char *argv[])
 	auto time_io_start = std::chrono::steady_clock::now(); // Start timing
 	if (mode == FAST_BINARY_SEARCH || mode == FAST_BINARY_SEARCH_AVX512)
 		read_guides(guides_filename, packer_2bit.pack_20mer, workload.genome_guides, workload.genome_guide_frequencies, workload.guide, workload.guide_frequencies);
-	else
+	else			// if (mode == HAMMING_DISTANCE)
 		read_guides(guides_filename, packer_3bit.pack_20mer, workload.genome_guides, workload.genome_guide_frequencies, workload.guide, workload.guide_frequencies);
 	auto time_io_end = std::chrono::steady_clock::now(); // Stop timing
 	auto time_io_duration = std::chrono::duration_cast<std::chrono::microseconds>(time_io_end - time_io_start).count();
