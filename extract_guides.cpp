@@ -79,22 +79,26 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 				into.write((const char *)base - 21, 20);
 				into.write("  +  ", 5);
 				into.write(sequence_number.c_str(), sequence_number.size());
-				into.write(" ", 1);
 
-				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 20);
-				*end_of_number++ = ' ';
-				*end_of_number++ = *base;
-				*end_of_number = '\n';
+				// C++11 version
+				auto len = snprintf(number, sizeof(number), " %ld %c\n", base - chromosome - 20, *base);
+				into.write(number, len);
 
-				into.write(number, end_of_number - number + 1);
-
+				// C++17 verison
+//				into.write(" ", 1);
+//				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 20);
+//				*end_of_number++ = ' ';
+//				*end_of_number++ = *base;
+//				*end_of_number = '\n';
+//				into.write(number, end_of_number - number + 1);
 				}
 			}
 		/*
 			Include the reverse complement sequences.  That is, ones that the other DNA strand matches the regular expression [ACG][ATCG]20[AG]G.
 			That is, this strand is C[TC][ACTG]20[TGC].
 
-			NOTE: THIS CANNOT BE AN ELSE AS THE CC MIGHT OVERLAP A GG
+			NOTE: THIS CANNOT BE AN ELSE AS THE CC MIGHT OVERLAP A GG (that is, a sequence might be: CC[ACTG][ACTG]17[ACTG]GG) in which case the forwaed and
+			sequence as well as the reverse complement are both matches
 		*/
 		if (*(base - 20) == 'C' && (*(base - 19) == 'C' || *(base - 19) == 'T'))
 			{
@@ -119,13 +123,18 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 				into.write(flipped, 20);
 				into.write("  -  ", 5);
 				into.write(sequence_number.c_str(), sequence_number.size());
-				into.write(" ", 1);
 
-				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 19);
-				*end_of_number++ = ' ';
-				*end_of_number++ = *(base - 19) == 'C' ? 'G' : 'A';				// complement of the start (C[TC] -> G[AG]) so output A for off-targets (documents) and G for guides (queries) or off-targets (documents).
-				*end_of_number = '\n';
-				into.write(number, end_of_number - number + 1);
+				// C++11 version
+				auto len = snprintf(number, sizeof(number), " %ld %c\n", base - chromosome - 19, *(base - 19) == 'C' ? 'G' : 'A');
+				into.write(number, len);
+
+				// C++17 verison
+//				into.write(" ", 1);
+//				auto [end_of_number, error_code] = std::to_chars(number, number + sizeof(number), base - chromosome - 19);
+//				*end_of_number++ = ' ';
+//				*end_of_number++ = *(base - 19) == 'C' ? 'G' : 'A';				// complement of the start (C[TC] -> G[AG]) so output A for off-targets (documents) and G for guides (queries) or off-targets (documents).
+//				*end_of_number = '\n';
+//				into.write(number, end_of_number - number + 1);
 				}
 			}
 		}

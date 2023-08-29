@@ -1,6 +1,6 @@
 all : fast_binary_search.exe extract_guides.exe
 
-CPP_LINK_FLAGS = /std:c++17 /EHsc /Zi
+CPP_LINK_FLAGS = /std:c++11 /EHsc /Zi
 CPPFLAGS = $(CPP_LINK_FLAGS) /c
 CPP = cl
 

@@ -86,12 +86,12 @@ class finder
 
 			output_buffer[20] = ' ';
 			int bytes = snprintf(&output_buffer[21], &output_buffer[49] - &output_buffer[21], "%2.2f\n", score);
-//						auto [string_end, error] = std::to_chars(&output_buffer[21], &output_buffer[49], (int)(score * 100.0));
-//						*string_end++ = '\n';
-//						*string_end = '\0';
+//				auto [string_end, error] = std::to_chars(&output_buffer[21], &output_buffer[49], (int)(score * 100.0));
+//				*string_end++ = '\n';
+//				*string_end = '\0';
 
 			workload.file_mutex.lock();
-//							fwrite(output_buffer, sizeof(char), string_end - output_buffer, workload.output_file);
+//					fwrite(output_buffer, sizeof(char), string_end - output_buffer, workload.output_file);
 				fwrite(output_buffer, sizeof(char), bytes + 21, workload.output_file);
 			workload.file_mutex.unlock();
 

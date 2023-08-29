@@ -100,22 +100,6 @@ void uniq(std::vector<uint64_t> &data, std::vector<uint16_t> &frequencies)
 	}
 
 /*
-	Allocate space for the final set of results
-*/
-std::vector<std::vector<sequence_score_pair>> all_positions;
-
-/*
-	Command line parameters
-*/
-enum { FAST_BINARY_SEARCH, FAST_BINARY_SEARCH_AVX512, HAMMING_DISTANCE };
-const std::string mode_name[] = { "Binary Search", "Binary Search using AVX512", "Hamming Distance" };
-size_t TESTSIZE;
-int mode = FAST_BINARY_SEARCH;
-std::string guides_filename = "OryzaSativaGuides.txt";
-const char *output_filename = nullptr;
-size_t thread_count = std::thread::hardware_concurrency();
-
-/*
 	READ_GUIDES()
 	-------------
 */
@@ -147,23 +131,10 @@ void read_guides(const std::string &filename, PACKER pack_20mer, std::vector<uin
 		exit(1);
 		}
 
-int line = 0;
 	do
 		{
-		line++;
 		guide++;
-if (line >= 72172820)
-	{
-	printf("%20.20s\n", guide);
-	fflush(stdout);
-	}
 		uint64_t packed_guide = pack_20mer(guide);
-
-if (packed_guide == 4511986849415)
-	{
-	printf("line %d: %llX [%20.20s]\n", line, packed_guide, guide);
-	fflush(stdout);
-	}
 
 		/*
 			Sequences ending in GG are guides (queries), those ending GG or AG are off-target sites (documents).
@@ -193,7 +164,9 @@ if (packed_guide == 4511986849415)
 */
 int usage(const char *exename)
 	{
-	std::cout << "Usage:" << exename << "[-b | -B | -h] [-f<filename>] [-o<filename>] [-t<threadcount>\n";
+	std::cout << "Usage:" << exename << "[-b | -B | -h] [-f<filename>] [-o<filename>] [-t<threadcount>] [-debug]\n";
+	std::cout << "       -? | -help print this help message\n";
+	std::cout << "       -debug only search for the first 10,000 guides\n";
 	std::cout << "       -b for binary search [default]\n";
 //	std::cout << "       -B for binary search using AVX512 instructions\n";
 	std::cout << "       -h for hamming distance\n";
@@ -203,6 +176,22 @@ int usage(const char *exename)
 
 	return 0;
 	}
+
+/*
+	Allocate space for the final set of results
+*/
+std::vector<std::vector<sequence_score_pair>> all_positions;
+
+/*
+	Command line parameters
+*/
+enum { FAST_BINARY_SEARCH, FAST_BINARY_SEARCH_AVX512, HAMMING_DISTANCE };
+const std::string mode_name[] = { "Binary Search", "Binary Search using AVX512", "Hamming Distance" };
+int mode = FAST_BINARY_SEARCH;
+std::string guides_filename = "OryzaSativaGuides.txt";
+const char *output_filename = nullptr;
+size_t thread_count = std::thread::hardware_concurrency();
+bool debug = false;				// test only the first 10,000 guides
 
 /*
 	MAIN()
@@ -220,7 +209,11 @@ int main(int argc, const char *argv[])
 		{
 		for (int arg = 1; arg < argc; arg++)
 			{
-			if (std::string(argv[arg]) == "-b")
+			if (std::string(argv[arg]) == "-?" || std::string(argv[arg]) == "-help" )
+				exit(usage(argv[0]));
+			if (std::string(argv[arg]) == "-debug")
+				debug = true;
+			else if (std::string(argv[arg]) == "-b")
 				mode = FAST_BINARY_SEARCH;
 			else if (std::string(argv[arg]) == "-B")
 				mode = FAST_BINARY_SEARCH_AVX512;
@@ -285,11 +278,12 @@ int main(int argc, const char *argv[])
 	/*
 		Generate some samples (sometimes random, and sometimes not, so keep both versions)
 	*/
-	if (true)
+	if (debug)
 		{
-		TESTSIZE = 10000;
-		workload.guide.resize(TESTSIZE);
-		workload.guide_frequencies.resize(TESTSIZE);
+		size_t test_size = 10000;
+		std::cout << "Testing on only the first " << test_size << " guides\n";
+		workload.guide.resize(test_size);
+		workload.guide_frequencies.resize(test_size);
 		}
 
 	std::cout << "Loaded " << workload.guide.size() << " test guides, " <<  workload.genome_guides.size() << " genome guides" << '\n';
@@ -357,8 +351,9 @@ int main(int argc, const char *argv[])
 	/*
 		Dump the statistics
 	*/
-	std::cout << "Number of test guides: " << TESTSIZE << '\n';
-	std::cout << "Number of test guides with matches within 4: " << workload.hits << '\n';
+	std::cout << "Number of guides (queries): " << workload.guide.size() << '\n';
+	std::cout << "Number of off-site targets (documents): " << workload.genome_guides.size() << '\n';
+	std::cout << "Number of guides with matches within 4: " << workload.hits << '\n';
 	std::string overall_best = (mode == FAST_BINARY_SEARCH || mode == FAST_BINARY_SEARCH_AVX512) ? packer_2bit.unpack_20mer(workload.best_20mer) : packer_3bit.unpack_20mer(workload.best_20mer);
 	std::cout << "Best score: " << workload.best_score << " " << overall_best << '\n';
 	std::cout << "Mean Execution time (getvar+intersect): " << duration2 / 1000000.001 << " seconds" << '\n';

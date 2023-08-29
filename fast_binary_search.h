@@ -207,12 +207,7 @@ class fast_binary_search : public finder
 				uint64_t guide = workload.guide[guide_index];
 				try
 					{
-
-//guide =  0x1301C5;
-
 					double score = generate_variations(threshold_sum, guide);
-
-//printf("%llX (%s) -> %f\n", guide, encode_kmer_2bit::unpack_20mer(guide).c_str(), score);
 
 					if (score <= threshold_sum)
 						{
