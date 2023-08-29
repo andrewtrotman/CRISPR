@@ -81,7 +81,7 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 				into.write(sequence_number.c_str(), sequence_number.size());
 
 				// C++11 version
-				auto len = snprintf(number, sizeof(number), " %ld %c\n", base - chromosome - 20, *base);
+				auto len = snprintf(number, sizeof(number), " %ld %c\n", (long)(base - chromosome - 20), *base);
 				into.write(number, len);
 
 				// C++17 verison
@@ -125,7 +125,7 @@ void extract_20mers(JASS::file &into, const std::string sequence_number, const u
 				into.write(sequence_number.c_str(), sequence_number.size());
 
 				// C++11 version
-				auto len = snprintf(number, sizeof(number), " %ld %c\n", base - chromosome - 19, *(base - 19) == 'C' ? 'G' : 'A');
+				auto len = snprintf(number, sizeof(number), " %ld %c\n", (long)(base - chromosome - 19), *(base - 19) == 'C' ? 'G' : 'A');
 				into.write(number, len);
 
 				// C++17 verison
