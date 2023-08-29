@@ -25,7 +25,7 @@ e.g.
 AGGGTTTAGGGTTTAGGGTT  -  1 1001 A
 ```
 
-where AGGGTTTAGGGTTTAGGGTT is the 20-mer, 1 is the chromosome, 1001 is the location on the chromosome, and A the that the N[AG]G at the end of the CRISPR site is NAG not NGG.
+where AGGGTTTAGGGTTTAGGGTT is the 20-mer, - is the complement strand to the fasta file, 1 is the chromosome number, 1001 is the location on the chromosome, and A is that the N[AG]G at the end of the CRISPR site is NAG not NGG.  And appropriately for reverse complement strands
 
 
 To do the search run fast_binary_search,
@@ -49,6 +49,6 @@ For example,
 ./fast_binary_search -f OryzaSativaGuides.txt -o OryzaSativaGuides.out.txt
 ```
 
-Various statistics are reported including the time to search, and the "best" 20-mer.  The output fle reposts all the 20-mers that score sufficiently highly that that they might be useful (t <= 0.75 accumulated MIT score).
+Various statistics are reported including the time to search, and the "best" 20-mer.  The output file reposts all the 20-mers that score sufficiently highly that they might be useful (t <= 0.75 accumulated MIT score).
 
 
