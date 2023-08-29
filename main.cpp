@@ -164,7 +164,7 @@ void read_guides(const std::string &filename, PACKER pack_20mer, std::vector<uin
 */
 int usage(const char *exename)
 	{
-	std::cout << "Usage:" << exename << "[-b | -B | -h] [-f<filename>] [-o<filename>] [-t<threadcount>] [-debug]\n";
+	std::cout << "Usage:" << exename << " [-b | -h] [-f<filename>] [-o<filename>] [-t<threadcount>] [-debug]\n";
 	std::cout << "       -? | -help print this help message\n";
 	std::cout << "       -debug only search for the first 10,000 guides\n";
 	std::cout << "       -b for binary search [default]\n";
@@ -215,8 +215,8 @@ int main(int argc, const char *argv[])
 				debug = true;
 			else if (std::string(argv[arg]) == "-b")
 				mode = FAST_BINARY_SEARCH;
-			else if (std::string(argv[arg]) == "-B")
-				mode = FAST_BINARY_SEARCH_AVX512;
+//			else if (std::string(argv[arg]) == "-B")
+//				mode = FAST_BINARY_SEARCH_AVX512;
 			else if (std::string(argv[arg]) == "-h")
 				mode = HAMMING_DISTANCE;
 			else if (strncmp(argv[arg], "-f", 2) == 0)
