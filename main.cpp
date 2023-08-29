@@ -119,7 +119,7 @@ void read_guides(const std::string &filename, PACKER pack_20mer, std::vector<uin
 	JASS::file::file_read_only memory_map;
 	char *guide;
 	const uint8_t *address_in_memory;
-	size_t length;
+	int64_t length;
 
 	memory_map.open(filename);
 	length = memory_map.read_entire_file(address_in_memory);
